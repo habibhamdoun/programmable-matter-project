@@ -6,7 +6,8 @@ import math
 from collections import deque
 import time
 
-# Constants for grid configuration
+
+
 DEFAULT_GRID_SIZE = 10
 DEFAULT_CELL_SIZE = 40
 DEFAULT_NUM_ACTIVE_CELLS = 20
@@ -15,57 +16,74 @@ ACTIVE_COLOR = "blue"
 INACTIVE_COLOR = "white"
 OBSTACLE_COLOR = "red"
 TARGET_HIGHLIGHT_COLOR = "lightgreen"
-HELP_REQUEST_COLOR = "yellow"  # Color for cells requesting help
+HELP_REQUEST_COLOR = "yellow"  
+
 DEFAULT_ANIMATION_SPEED = 100
 
-# Constants for movement modes
-MOVEMENT_MODE_SEQUENTIAL = "sequential"  # Default mode - one cell at a time
-MOVEMENT_MODE_PARALLEL = "parallel"      # Multiple cells move simultaneously but in lockstep
-MOVEMENT_MODE_ASYNC = "asynchronous"     # Cells move at individual speeds based on priority
 
-# Constants for pathfinding algorithms
+
+MOVEMENT_MODE_SEQUENTIAL = "sequential"  
+
+MOVEMENT_MODE_PARALLEL = "parallel"      
+
+MOVEMENT_MODE_ASYNC = "asynchronous"     
+
+
+
+
 ALGORITHM_ASTAR = "A*"
 ALGORITHM_GREEDY = "Greedy"
 ALGORITHM_DIJKSTRA = "Dijkstra"
 ALGORITHM_BFS = "BFS"
 ALGORITHM_BELLMAN_FORD = "Bellman-Ford"
 
-# Allow diagonal movement
-ALLOW_DIAGONAL = False  # This will be toggled via UI
 
-# Coordination mode
-COORDINATION_MODE = True  # Centralized by default, will be toggled via UI
 
-# Cohesion mode - cells stay connected
-COHESION_MODE = False  # Off by default, will be toggled via UI
+ALLOW_DIAGONAL = False  
+
+
+
+
+COORDINATION_MODE = True  
+
+
+
+
+COHESION_MODE = False  
+
 
 class InteractiveGrid:
     def __init__(self, root, grid_size=DEFAULT_GRID_SIZE, cell_size=DEFAULT_CELL_SIZE, num_active_cells=DEFAULT_NUM_ACTIVE_CELLS):
         self.root = root
         self.root.title("Programmable Matter Simulation - Enhanced")
         
-        # Grid configuration
+        
+        
         self.grid_size = grid_size
         self.cell_size = cell_size
         self.num_active_cells = num_active_cells
         self.animation_speed = DEFAULT_ANIMATION_SPEED
         
-        # Performance metrics
+        
+        
         self.step_count = 0
         self.start_time = None
         self.total_cost = 0
         
-        # Cell states
+        
+        
         self.cells = {}
         self.cell_numbers = {}  
         self.cell_number_text = {}  
         self.next_cell_number = 1
         
-        # UI state
+        
+        
         self.obstacle_mode = False
         self.obstacles = set()
         self.selected_shape = tk.StringVar(value="rectangle")
-        self.movement_mode = tk.StringVar(value=MOVEMENT_MODE_PARALLEL)  # Changed default to parallel
+        self.movement_mode = tk.StringVar(value=MOVEMENT_MODE_PARALLEL)  
+        
         self.pathfinding_algorithm = tk.StringVar(value=ALGORITHM_ASTAR)
         self.heuristic_weight = tk.DoubleVar(value=1.0)
         self.speed_var = tk.IntVar(value=DEFAULT_ANIMATION_SPEED)
@@ -74,7 +92,8 @@ class InteractiveGrid:
         self.coordination_mode = tk.BooleanVar(value=COORDINATION_MODE)
         self.cohesion_mode = tk.BooleanVar(value=COHESION_MODE)
         
-        # Simulation state
+        
+        
         self.movement_in_progress = False
         self.reset_requested = False  
         self.completed_targets = set()
@@ -82,39 +101,49 @@ class InteractiveGrid:
         self.custom_shape = []
         self.temp_move_count = 0
         self.pending_callback = None
-        self.cells_requesting_help = set()  # Cells that are stuck and need help
-        self.help_response_cells = {}  # Cells that can provide help
+        self.cells_requesting_help = set()  
         
-        # Status variables
+        self.help_response_cells = {}  
+        
+        
+        
+        
         self.status_var = tk.StringVar(value="Ready. Select options and press 'Form Shape'")
         self.counter_var = tk.StringVar(value=f"Active cells: {num_active_cells}/{num_active_cells}")
         self.metrics_var = tk.StringVar(value="Steps: 0 | Time: 0.0s | Cost: 0.0")
         
-        # Setup UI
+        
+        
         self.setup_ui()
         self.draw_grid()
         
-        # Create help window
+        
+        
         self.create_help_window()
     
     def setup_ui(self):
-        # Main container frame with scrollbars
+        
+        
         self.main_frame = tk.Frame(self.root)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Create canvas with scrollbars for large grids
+        
+        
         self.canvas_frame = tk.Frame(self.main_frame)
         self.canvas_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Add horizontal scrollbar
+        
+        
         h_scrollbar = tk.Scrollbar(self.canvas_frame, orient=tk.HORIZONTAL)
         h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
         
-        # Add vertical scrollbar
+        
+        
         v_scrollbar = tk.Scrollbar(self.canvas_frame)
         v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Create canvas that supports scrolling
+        
+        
         self.canvas = tk.Canvas(self.canvas_frame, 
                                width=min(800, self.grid_size * self.cell_size),
                                height=min(600, self.grid_size * self.cell_size),
@@ -123,21 +152,25 @@ class InteractiveGrid:
                                yscrollcommand=v_scrollbar.set)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Configure scrollbars
+        
+        
         h_scrollbar.config(command=self.canvas.xview)
         v_scrollbar.config(command=self.canvas.yview)
         
-        # Configure canvas scrolling region (will be set properly after grid is drawn)
+        
+        
         self.canvas.bind("<Button-1>", self.on_canvas_click)
         
-        # Control frames
+        
+        
         config_frame = tk.Frame(self.main_frame)
         config_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
         
         control_frame = tk.Frame(self.main_frame)
         control_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
         
-        # Grid configuration controls
+        
+        
         tk.Label(config_frame, text="Grid Size:").grid(row=0, column=0, padx=5, pady=2)
         self.grid_size_var = tk.IntVar(value=self.grid_size)
         self.grid_size_entry = tk.Entry(config_frame, textvariable=self.grid_size_var, width=5)
@@ -159,11 +192,13 @@ class InteractiveGrid:
         help_btn = tk.Button(config_frame, text="Help", command=self.show_help)
         help_btn.grid(row=0, column=7, padx=5, pady=2)
         
-        # Left side controls: Shape selection
+        
+        
         shape_frame = tk.LabelFrame(control_frame, text="Target Shape")
         shape_frame.pack(side=tk.LEFT, padx=10, fill=tk.Y)
         
-        # Create a list of shapes with radiobuttons
+        
+        
         shapes = [
             ("Rectangle", "rectangle"),
             ("Pyramid", "pyramid"),
@@ -190,7 +225,8 @@ class InteractiveGrid:
                                                command=self.toggle_target_highlight)
         self.highlight_checkbox.pack(anchor="w")
         
-        # Obstacle controls
+        
+        
         obstacle_frame = tk.LabelFrame(control_frame, text="Obstacles")
         obstacle_frame.pack(side=tk.LEFT, padx=10, fill=tk.Y)
         
@@ -203,7 +239,8 @@ class InteractiveGrid:
         self.clear_obstacles_btn = tk.Button(obstacle_frame, text="Clear Obstacles", command=self.clear_obstacles)
         self.clear_obstacles_btn.pack(pady=2)
         
-        # Movement mode controls
+        
+        
         movement_frame = tk.LabelFrame(control_frame, text="Movement Mode")
         movement_frame.pack(side=tk.LEFT, padx=10, fill=tk.Y)
         
@@ -214,17 +251,20 @@ class InteractiveGrid:
         tk.Radiobutton(movement_frame, text="Asynchronous", variable=self.movement_mode, 
                       value=MOVEMENT_MODE_ASYNC).pack(anchor="w")
         
-        # Diagonal movement option
+        
+        
         tk.Checkbutton(movement_frame, text="Allow Diagonal Movement", 
                      variable=self.allow_diagonal,
                      command=self.toggle_diagonal_movement).pack(anchor="w", pady=5)
         
-        # Cohesion mode option (cells stay connected)
+        
+        
         tk.Checkbutton(movement_frame, text="Maintain Cohesion", 
                      variable=self.cohesion_mode,
                      command=self.toggle_cohesion_mode).pack(anchor="w", pady=5)
         
-        # Coordination mode option
+        
+        
         coord_frame = tk.Frame(movement_frame)
         coord_frame.pack(fill=tk.X, pady=5)
         
@@ -233,11 +273,13 @@ class InteractiveGrid:
                                                  command=self.toggle_coordination_mode)
         self.coordination_checkbox.pack(side=tk.LEFT)
         
-        # Info button for coordination mode
+        
+        
         info_btn = tk.Button(coord_frame, text="?", width=2, command=self.show_coordination_info)
         info_btn.pack(side=tk.LEFT, padx=5)
         
-        # Speed control
+        
+        
         speed_frame = tk.Frame(movement_frame)
         speed_frame.pack(fill=tk.X, pady=5)
         tk.Label(speed_frame, text="Speed:").pack(side=tk.LEFT)
@@ -246,7 +288,8 @@ class InteractiveGrid:
                                command=self.update_speed)
         speed_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # Algorithm selection
+        
+        
         algorithm_frame = tk.LabelFrame(control_frame, text="Pathfinding Algorithm")
         algorithm_frame.pack(side=tk.LEFT, padx=10, fill=tk.Y)
         
@@ -261,11 +304,13 @@ class InteractiveGrid:
         tk.Radiobutton(algorithm_frame, text="Bellman-Ford", variable=self.pathfinding_algorithm, 
                       value=ALGORITHM_BELLMAN_FORD, command=self.show_algorithm_info).pack(anchor="w")
         
-        # Algorithm info button
+        
+        
         algo_info_btn = tk.Button(algorithm_frame, text="Algorithm Info", command=self.show_algorithm_info)
         algo_info_btn.pack(pady=5)
         
-        # Heuristic weight slider for A* and Greedy
+        
+        
         heuristic_frame = tk.Frame(algorithm_frame)
         heuristic_frame.pack(fill=tk.X, pady=5)
         tk.Label(heuristic_frame, text="Heuristic Weight:").pack(anchor="w")
@@ -274,11 +319,13 @@ class InteractiveGrid:
                                       command=self.update_heuristic_label)
         self.heuristic_scale.pack(fill=tk.X)
         
-        # Add a label explaining the current heuristic weight
+        
+        
         self.heuristic_label = tk.Label(heuristic_frame, text="Balanced (Default)")
         self.heuristic_label.pack(anchor="w")
         
-        # Action buttons
+        
+        
         button_frame = tk.Frame(control_frame)
         button_frame.pack(side=tk.RIGHT, padx=10)
         
@@ -294,7 +341,8 @@ class InteractiveGrid:
         self.counter_label = tk.Label(button_frame, textvariable=self.counter_var)
         self.counter_label.pack(pady=5)
         
-        # Performance metrics display
+        
+        
         metrics_frame = tk.Frame(self.main_frame)
         metrics_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
         
@@ -302,11 +350,13 @@ class InteractiveGrid:
                                font=("Arial", 10, "bold"))
         metrics_label.pack(side=tk.LEFT, padx=10)
         
-        # Status bar
+        
+        
         self.status_label = tk.Label(self.root, textvariable=self.status_var, bd=1, relief=tk.SUNKEN, anchor=tk.W)
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
         
-        # Update heuristic label
+        
+        
         self.update_heuristic_label()
 
     def toggle_obstacle_mode(self):
@@ -322,7 +372,8 @@ class InteractiveGrid:
 
     def create_help_window(self):
         """Create a help window with tabs for different topics"""
-        self.help_window = None  # Will be created when needed
+        self.help_window = None  
+        
     
     def show_help(self):
         """Show the help window"""
@@ -334,11 +385,13 @@ class InteractiveGrid:
         self.help_window.title("Programmable Matter Simulation Help")
         self.help_window.protocol("WM_DELETE_WINDOW", self.close_help_window)
         
-        # Create notebook (tabbed interface)
+        
+        
         notebook = tk.ttk.Notebook(self.help_window)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # General help tab
+        
+        
         general_frame = tk.Frame(notebook)
         notebook.add(general_frame, text="General")
         
@@ -377,7 +430,8 @@ class InteractiveGrid:
         general_text_widget.config(state=tk.DISABLED)
         general_text_widget.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
-        # Algorithms tab
+        
+        
         algo_frame = tk.Frame(notebook)
         notebook.add(algo_frame, text="Algorithms")
         
@@ -427,7 +481,8 @@ class InteractiveGrid:
         algo_text_widget.config(state=tk.DISABLED)
         algo_text_widget.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
-        # Coordination tab
+        
+        
         coord_frame = tk.Frame(notebook)
         notebook.add(coord_frame, text="Coordination")
         
@@ -470,7 +525,8 @@ class InteractiveGrid:
         coord_text_widget.config(state=tk.DISABLED)
         coord_text_widget.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
-        # Movement tab
+        
+        
         movement_frame = tk.Frame(notebook)
         notebook.add(movement_frame, text="Movement")
         
@@ -519,7 +575,8 @@ class InteractiveGrid:
         movement_text_widget.config(state=tk.DISABLED)
         movement_text_widget.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
-        # Position window
+        
+        
         window_width = 700
         window_height = 500
         screen_width = self.help_window.winfo_screenwidth()
@@ -637,7 +694,8 @@ class InteractiveGrid:
             """
         }
         
-        # Create or update popup window
+        
+        
         if hasattr(self, 'algorithm_info_window') and self.algorithm_info_window is not None:
             try:
                 self.algorithm_info_window.destroy()
@@ -647,18 +705,21 @@ class InteractiveGrid:
         self.algorithm_info_window = tk.Toplevel(self.root)
         self.algorithm_info_window.title(f"{algorithm} Algorithm Info")
         
-        # Add algorithm description
+        
+        
         text_widget = scrolledtext.ScrolledText(self.algorithm_info_window, wrap=tk.WORD, width=50, height=20)
         text_widget.insert(tk.END, info.get(algorithm, "No information available"))
         text_widget.config(state=tk.DISABLED)
         text_widget.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
         
-        # Add close button
+        
+        
         close_button = tk.Button(self.algorithm_info_window, text="Close", 
                                command=self.algorithm_info_window.destroy)
         close_button.pack(pady=10)
         
-        # Position window
+        
+        
         window_width = 450
         window_height = 400
         screen_width = self.algorithm_info_window.winfo_screenwidth()
@@ -708,18 +769,21 @@ class InteractiveGrid:
         - Enable Cohesion for simulating physical constraints
         """
         
-        # Add coordination description
+        
+        
         text_widget = scrolledtext.ScrolledText(self.coordination_info_window, wrap=tk.WORD, width=50, height=20)
         text_widget.insert(tk.END, info_text)
         text_widget.config(state=tk.DISABLED)
         text_widget.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
         
-        # Add close button
+        
+        
         close_button = tk.Button(self.coordination_info_window, text="Close", 
                                command=self.coordination_info_window.destroy)
         close_button.pack(pady=10)
         
-        # Position window
+        
+        
         window_width = 450
         window_height = 400
         screen_width = self.coordination_info_window.winfo_screenwidth()
@@ -777,7 +841,8 @@ class InteractiveGrid:
     
     def on_shape_changed(self):
         """Callback for when the shape selection changes"""
-        # Force update of target highlights
+        
+        
         if self.highlight_targets.get():
             self.update_target_highlights()
     
@@ -786,24 +851,30 @@ class InteractiveGrid:
     
     def apply_configuration(self):
         try:
-            new_grid_size = max(5, min(50, self.grid_size_var.get()))  # Limit between 5-50
-            new_cell_size = max(5, min(60, self.cell_size_var.get()))  # Limit between 5-60
+            new_grid_size = max(5, min(50, self.grid_size_var.get()))  
+            
+            new_cell_size = max(5, min(60, self.cell_size_var.get()))  
+            
             new_num_cells = max(4, min(new_grid_size * new_grid_size // 2, self.num_cells_var.get()))
             
-            # Fix to always maintain 20 cells
+            
+            
             new_num_cells = 20
             
-            # Update variables
+            
+            
             self.grid_size = new_grid_size
             self.cell_size = new_cell_size
             self.num_active_cells = new_num_cells
             
-            # Update UI to match
+            
+            
             self.grid_size_var.set(self.grid_size)
             self.cell_size_var.set(self.cell_size)
             self.num_cells_var.set(self.num_active_cells)
             
-            # Reset and redraw grid
+            
+            
             self.cancel_pending_callback()
             self.movement_in_progress = False
             self.reset_requested = False
@@ -811,14 +882,17 @@ class InteractiveGrid:
             self.completed_targets = set()
             self.active_to_target_assignments = {}
             
-            # Resize canvas and configure scrolling
+            
+            
             self.canvas.config(width=min(800, self.grid_size * self.cell_size), 
                               height=min(600, self.grid_size * self.cell_size))
             
-            # Clear canvas
+            
+            
             self.canvas.delete("all")
             
-            # Redraw the grid
+            
+            
             self.cells = {}
             self.cell_numbers = {}
             self.cell_number_text = {}
@@ -828,7 +902,8 @@ class InteractiveGrid:
             self.status_var.set(f"Grid resized to {self.grid_size}x{self.grid_size} with {self.num_active_cells} active cells")
             self.counter_var.set(f"Active cells: {self.num_active_cells}/{self.num_active_cells}")
             
-            # Reset performance metrics
+            
+            
             self.step_count = 0
             self.total_cost = 0
             self.start_time = None
@@ -850,7 +925,8 @@ class InteractiveGrid:
     
     def update_target_highlights(self):
         """Update the highlighting of target positions on the grid"""
-        # First clear all previous highlights
+        
+        
         for pos in self.cells:
             if not self.cells[pos]["active"] and pos not in self.obstacles:
                 self.canvas.itemconfig(self.cells[pos]["rect"], fill=INACTIVE_COLOR)
@@ -858,12 +934,14 @@ class InteractiveGrid:
         if not self.highlight_targets.get():
             return
         
-        # Get current target shape
+        
+        
         target_positions = self.get_target_positions()
         if not target_positions:
             return
             
-        # Apply highlights to target positions that aren't occupied by active cells or obstacles
+        
+        
         for pos in target_positions:
             if pos in self.cells and not self.cells[pos]["active"] and pos not in self.obstacles:
                 self.canvas.itemconfig(self.cells[pos]["rect"], fill=TARGET_HIGHLIGHT_COLOR)
@@ -893,10 +971,13 @@ class InteractiveGrid:
         center_row = self.grid_size // 2 - 1
         center_col = self.grid_size // 2 - 1
         
-        # Create a 4x5 rectangle (20 cells)
+        
+        
         positions = []
-        for r in range(center_row - 1, center_row + 3):  # 4 rows
-            for c in range(center_col - 1, center_col + 4):  # 5 columns
+        for r in range(center_row - 1, center_row + 3):  
+            
+            for c in range(center_col - 1, center_col + 4):  
+                
                 positions.append((r, c))
                 
         return positions
@@ -908,22 +989,27 @@ class InteractiveGrid:
         
         positions = []
         
-        # Row 1 (top) - 1 cell
+        
+        
         positions.append((center_row - 4, center_col + 1))
         
-        # Row 2 - 3 cells
+        
+        
         for c in range(center_col, center_col + 3):
             positions.append((center_row - 3, c))
         
-        # Row 3 - 5 cells
+        
+        
         for c in range(center_col - 1, center_col + 4):
             positions.append((center_row - 2, c))
         
-        # Row 4 - 5 cells
+        
+        
         for c in range(center_col - 1, center_col + 4):
             positions.append((center_row - 1, c))
             
-        # Row 5 (base) - 6 cells
+        
+        
         for c in range(center_col - 2, center_col + 4):
             positions.append((center_row, c))
             
@@ -936,29 +1022,36 @@ class InteractiveGrid:
         
         positions = []
         
-        # Row 1 (top) - 1 cell
+        
+        
         positions.append((center_row - 4, center_col + 1))
         
-        # Row 2 - 3 cells
+        
+        
         for c in range(center_col, center_col + 3):
             positions.append((center_row - 3, c))
         
-        # Row 3 - 5 cells
+        
+        
         for c in range(center_col - 1, center_col + 4):
             positions.append((center_row - 2, c))
         
-        # Row 4 - 5 cells
+        
+        
         for c in range(center_col - 1, center_col + 4):
             positions.append((center_row - 1, c))
         
-        # Row 5 - 3 cells
+        
+        
         for c in range(center_col, center_col + 3):
             positions.append((center_row, c))
         
-        # Row 6 (bottom) - 1 cell
+        
+        
         positions.append((center_row + 1, center_col + 1))
         
-        # Return exactly 20 cells (should already be 20)
+        
+        
         return positions[:20]
     
     def get_heart_shape(self):
@@ -968,34 +1061,42 @@ class InteractiveGrid:
         
         positions = []
         
-        # Top curved part (two circles side by side)
-        # Left bump
+        
+        
+        
+        
         positions.append((center_row - 3, center_col - 1))
         positions.append((center_row - 4, center_col - 1))
         positions.append((center_row - 4, center_col))
         
-        # Right bump
+        
+        
         positions.append((center_row - 3, center_col + 3))
         positions.append((center_row - 4, center_col + 3))
         positions.append((center_row - 4, center_col + 2))
         
-        # Top center
+        
+        
         positions.append((center_row - 3, center_col + 1))
         positions.append((center_row - 3, center_col))
         positions.append((center_row - 3, center_col + 2))
         
-        # Middle section
+        
+        
         for c in range(center_col - 2, center_col + 5):
             positions.append((center_row - 2, c))
         
-        # Bottom tapered section
+        
+        
         for c in range(center_col - 1, center_col + 4):
             positions.append((center_row - 1, c))
         
-        # Point
+        
+        
         positions.append((center_row, center_col + 1))
         
-        # Ensure exactly 20 cells
+        
+        
         return positions[:20]
     
     def get_circle_shape(self):
@@ -1003,26 +1104,32 @@ class InteractiveGrid:
         center_row = self.grid_size // 2 - 1
         center_col = self.grid_size // 2 - 1
         
-        # Calculate positions approximating a circle with 20 cells
+        
+        
         positions = []
         
-        # Define a reference circle with radius 2.5
+        
+        
         radius = 2.5
         for r in range(center_row - 3, center_row + 4):
             for c in range(center_col - 3, center_col + 4):
-                # Calculate distance from center
+                
+                
                 dr = r - center_row
                 dc = c - center_col
                 distance = (dr*dr + dc*dc) ** 0.5
                 
-                # Add if within radius
+                
+                
                 if distance <= radius:
                     positions.append((r, c))
         
-        # Sort by distance from center to ensure we get the most "circle-like" cells
+        
+        
         positions.sort(key=lambda pos: abs((pos[0] - center_row)**2 + (pos[1] - center_col)**2 - radius**2))
         
-        return positions[:20]  # Ensure exactly 20 cells
+        return positions[:20]  
+        
     
     def get_cross_shape(self):
         """Generate cross shape positions (exactly 20 cells)"""
@@ -1031,16 +1138,20 @@ class InteractiveGrid:
         
         positions = []
         
-        # Vertical bar (8 cells)
+        
+        
         for r in range(center_row - 3, center_row + 5):
             positions.append((r, center_col + 1))
             
-        # Horizontal bar (12 cells, minus the center which is already counted)
+        
+        
         for c in range(center_col - 4, center_col + 6):
-            if c != center_col + 1:  # Skip the center cell that's already in the vertical bar
+            if c != center_col + 1:  
+                
                 positions.append((center_row, c))
                 
-        return positions[:20]  # Ensure exactly 20 cells
+        return positions[:20]  
+        
     
     def get_arrow_shape(self):
         """Generate arrow shape positions (exactly 20 cells)"""
@@ -1049,28 +1160,34 @@ class InteractiveGrid:
         
         positions = []
         
-        # Arrow head (pointing up)
-        positions.append((center_row - 4, center_col + 1))  # Tip
         
-        # Second row of head
+        
+        positions.append((center_row - 4, center_col + 1))  
+        
+        
+        
+        
         positions.append((center_row - 3, center_col))
         positions.append((center_row - 3, center_col + 1))
         positions.append((center_row - 3, center_col + 2))
         
-        # Third row (wider)
+        
+        
         positions.append((center_row - 2, center_col - 1))
         positions.append((center_row - 2, center_col))
         positions.append((center_row - 2, center_col + 1))
         positions.append((center_row - 2, center_col + 2))
         positions.append((center_row - 2, center_col + 3))
         
-        # Shaft
+        
+        
         for r in range(center_row - 1, center_row + 4):
             positions.append((r, center_col))
             positions.append((r, center_col + 1))
             positions.append((r, center_col + 2))
         
-        # Ensure exactly 20 cells
+        
+        
         return positions[:20]
     
     def open_shape_designer(self):
@@ -1086,17 +1203,20 @@ class InteractiveGrid:
         if not shape_cells:
             return
             
-        # Ensure custom shape has exactly 20 cells
+        
+        
         if len(shape_cells) > 20:
             shape_cells = shape_cells[:20]
             messagebox.showinfo("Shape Truncated", 
                               f"Custom shape has been truncated to 20 cells to match active cell count.")
         elif len(shape_cells) < 20:
-            # Center the shape
+            
+            
             center_row = self.grid_size // 2 - 1
             center_col = self.grid_size // 2 - 1
             
-            # Find all empty cells surrounding the shape
+            
+            
             occupied = set(shape_cells)
             candidates = []
             
@@ -1109,10 +1229,12 @@ class InteractiveGrid:
                             neighbor not in occupied):
                             candidates.append(neighbor)
                             
-            # Sort candidates by distance to center
+            
+            
             candidates.sort(key=lambda pos: abs(pos[0] - center_row) + abs(pos[1] - center_col))
             
-            # Add candidates until we have 20 cells
+            
+            
             for candidate in candidates:
                 if len(shape_cells) >= 20:
                     break
@@ -1128,23 +1250,29 @@ class InteractiveGrid:
         self.update_target_highlights()
     
     def generate_random_obstacles(self):
-        # Clear existing obstacles first
+        
+        
         self.clear_obstacles()
         
-        # Don't place obstacles on active cells or in the starting area
+        
+        
         occupied = set(pos for pos, cell in self.cells.items() if cell["active"])
         
-        # Number of obstacles - randomly between 5-15% of grid cells
+        
+        
         total_cells = self.grid_size * self.grid_size
         num_obstacles = random.randint(int(total_cells * 0.05), int(total_cells * 0.15))
         
-        # Get target positions to avoid placing obstacles there
+        
+        
         target_positions = set(self.get_target_positions())
         
-        # Generate obstacles
+        
+        
         obstacle_count = 0
         attempts = 0
-        max_attempts = total_cells * 2  # Prevent infinite loop
+        max_attempts = total_cells * 2  
+        
         
         while obstacle_count < num_obstacles and attempts < max_attempts:
             attempts += 1
@@ -1152,15 +1280,18 @@ class InteractiveGrid:
             col = random.randint(0, self.grid_size - 1)
             pos = (row, col)
             
-            # Skip if cell is occupied, already an obstacle, or a target position
+            
+            
             if pos in occupied or pos in self.obstacles or pos in target_positions:
                 continue
                 
-            # Skip starting area (bottom two rows)
+            
+            
             if row >= self.grid_size - 2:
                 continue
                 
-            # Add obstacle
+            
+            
             self.obstacles.add(pos)
             self.canvas.itemconfig(self.cells[pos]["rect"], fill=OBSTACLE_COLOR)
             obstacle_count += 1
@@ -1180,7 +1311,8 @@ class InteractiveGrid:
         if self.movement_in_progress:
             return
             
-        # Convert click coordinates to grid position
+        
+        
         canvas_x = self.canvas.canvasx(event.x)
         canvas_y = self.canvas.canvasy(event.y)
         col = int(canvas_x // self.cell_size)
@@ -1190,12 +1322,14 @@ class InteractiveGrid:
             pos = (row, col)
             
             if self.obstacle_mode:
-                # Don't allow placing obstacles on active cells
+                
+                
                 if self.cells[pos]["active"]:
                     self.status_var.set("Cannot place obstacles on active cells")
                     return
                     
-                # Toggle obstacle at this position
+                
+                
                 if pos in self.obstacles:
                     self.obstacles.remove(pos)
                     self.canvas.itemconfig(self.cells[pos]["rect"], fill=INACTIVE_COLOR)
@@ -1212,7 +1346,8 @@ class InteractiveGrid:
             self.pending_callback = None
     
     def draw_grid(self):
-        # Clear existing grid if any
+        
+        
         if hasattr(self, 'cells') and self.cells:
             for pos in self.cells:
                 self.canvas.delete(self.cells[pos]["rect"])
@@ -1222,12 +1357,14 @@ class InteractiveGrid:
         self.cell_numbers = {}
         self.cell_number_text = {}
         
-        # Set canvas scrolling region
+        
+        
         canvas_width = self.grid_size * self.cell_size
         canvas_height = self.grid_size * self.cell_size
         self.canvas.configure(scrollregion=(0, 0, canvas_width, canvas_height))
         
-        # Draw the grid cells
+        
+        
         for row in range(self.grid_size):
             for col in range(self.grid_size):
                 x1, y1 = col * self.cell_size, row * self.cell_size
@@ -1238,11 +1375,13 @@ class InteractiveGrid:
                                                text="", fill="black", font=("Arial", max(6, self.cell_size // 4)))
                 self.cell_number_text[(row, col)] = text_id
         
-        # Set up initial active cells at the bottom of the grid
+        
+        
         active_count = 0
         self.next_cell_number = 1
         
-        # Start from bottom right for better distribution
+        
+        
         for row in range(self.grid_size - 1, -1, -1):
             for col in range(self.grid_size - 1, -1, -1):
                 if active_count < self.num_active_cells:
@@ -1257,7 +1396,8 @@ class InteractiveGrid:
         self.update_counter()
         self.update_target_highlights()
         
-        # Reset performance metrics
+        
+        
         self.step_count = 0
         self.total_cost = 0
         self.start_time = None
@@ -1266,34 +1406,42 @@ class InteractiveGrid:
     def get_directions(self):
         """Get movement directions based on diagonal movement setting"""
         if self.allow_diagonal.get():
-            # 8 directions including diagonals
+            
+            
             return [(-1, 0), (1, 0), (0, -1), (0, 1), 
                     (-1, -1), (-1, 1), (1, -1), (1, 1)]
         else:
-            # 4 directions (no diagonals)
+            
+            
             return [(-1, 0), (1, 0), (0, -1), (0, 1)]
     
     def get_direction_cost(self, dr, dc):
         """Get the cost of moving in a particular direction"""
         if dr == 0 or dc == 0:
-            return 1.0  # Cardinal direction cost
+            return 1.0  
+            
         else:
-            return 1.414  # Diagonal cost (sqrt(2))
+            return 1.414  
+            
     
     def find_alternate_path(self, start_pos, target_pos, occupied_positions, obstacles):
         """Find alternate path when direct paths are blocked by obstacles"""
         occupied = occupied_positions.copy()
         
-        # Create a grid representation for pathfinding
+        
+        
         grid = [[0 for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         
-        # Mark obstacles and occupied cells
+        
+        
         for r in range(self.grid_size):
             for c in range(self.grid_size):
                 if (r, c) in obstacles or (r, c) in occupied and (r, c) != start_pos:
-                    grid[r][c] = 1  # Mark as obstacle
+                    grid[r][c] = 1  
+                    
         
-        # Use BFS for finding any possible path
+        
+        
         queue = deque([(start_pos, [])])
         visited = {start_pos}
         
@@ -1302,44 +1450,55 @@ class InteractiveGrid:
         while queue:
             (r, c), path = queue.popleft()
             
-            # Check if we reached the target
+            
+            
             if (r, c) == target_pos:
                 if path:
-                    return path[0]  # Return just the first step
+                    return path[0]  
+                    
                 return None
             
-            # Try all directions
+            
+            
             for dr, dc in directions:
                 nr, nc = r + dr, c + dc
                 
-                # Check boundaries and obstacles
+                
+                
                 if (0 <= nr < self.grid_size and 0 <= nc < self.grid_size and 
                     grid[nr][nc] == 0 and (nr, nc) not in visited):
                     new_path = path + [(nr, nc)]
                     queue.append(((nr, nc), new_path))
                     visited.add((nr, nc))
         
-        # If no path found, try removing obstacles temporarily to find a path
-        # We'll simulate pushing obstacles aside
+        
+        
+        
+        
         for (r, c) in obstacles:
-            # Skip if not adjacent to start_pos
+            
+            
             if self.manhattan_dist((r, c), start_pos) > 1:
                 continue
                 
-            # Try moving in each direction from this obstacle
+            
+            
             for dr, dc in directions:
                 nr, nc = r + dr, c + dc
                 
-                # Skip if out of bounds, already visited, or another obstacle
+                
+                
                 if not (0 <= nr < self.grid_size and 0 <= nc < self.grid_size):
                     continue
                 if (nr, nc) in obstacles or (nr, nc) in occupied and (nr, nc) != start_pos:
                     continue
                     
-                # This could be a valid move - return the obstacle position
+                
+                
                 return (r, c)
         
-        # If no path found, just try to move somewhere valid
+        
+        
         for dr, dc in directions:
             nr, nc = start_pos[0] + dr, start_pos[1] + dc
             if (0 <= nr < self.grid_size and 0 <= nc < self.grid_size and 
@@ -1349,31 +1508,207 @@ class InteractiveGrid:
         return None
     
     def is_move_valid_with_cohesion(self, start_pos, next_pos, occupied_positions):
+        """Completely redesigned cohesion check"""
+        
+        
+        if not self.cohesion_mode.get():
+            return True
+        
+        
+        
+        occupied_after_move = set(pos for pos in occupied_positions if pos != start_pos)
+        occupied_after_move.add(next_pos)
+        
+        
+        
+        if len(occupied_after_move) <= 1:
+            return True
+        
+        
+        
+        will_be_connected = False
+        for dr, dc in self.get_directions():
+            neighbor = (next_pos[0] + dr, next_pos[1] + dc)
+            if neighbor in occupied_after_move and neighbor != next_pos:
+                will_be_connected = True
+                break
+        
+        if not will_be_connected:
+            return False  
+            
+        
+        
+        
+        
+        
+        
+        
+        
+        cells_to_check = occupied_after_move.copy()
+        if len(cells_to_check) <= 1:
+            return True  
+            
+        
+        
+        
+        start_cell = next(iter(cells_to_check))
+        visited = {start_cell}
+        stack = [start_cell]
+        
+        
+        
+        while stack:
+            current = stack.pop()
+            for dr, dc in self.get_directions():
+                neighbor = (current[0] + dr, current[1] + dc)
+                if neighbor in cells_to_check and neighbor not in visited:
+                    visited.add(neighbor)
+                    stack.append(neighbor)
+        
+        
+        
+        return len(visited) == len(cells_to_check)
+
+    def is_connected(self, positions):
+        """Check if all cells in a set are connected - improved implementation"""
+        if not positions:
+            return True
+        if len(positions) == 1:
+            return True
+            
+        
+        
+        directions = self.get_directions()
+        
+        
+        
+        start = next(iter(positions))
+        visited = {start}
+        queue = deque([start])
+        
+        while queue:
+            current = queue.popleft()
+            
+            for dr, dc in directions:
+                neighbor = (current[0] + dr, current[1] + dc)
+                if neighbor in positions and neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+        
+        
+        
+        return len(visited) == len(positions)
+
+    def is_move_valid_with_cohesion(self, start_pos, next_pos, occupied_positions):
+        """Improved method to check if a move maintains cohesion"""
+        if not self.cohesion_mode.get():
+            return True
+        
+        
+        
+        is_adjacent_move = False
+        for dr, dc in self.get_directions():
+            if (start_pos[0] + dr, start_pos[1] + dc) == next_pos:
+                is_adjacent_move = True
+                break
+        
+        
+        
+        if not is_adjacent_move:
+            return False
+        
+        
+        
+        new_positions = set(pos for pos in occupied_positions if pos != start_pos)
+        new_positions.add(next_pos)
+        
+        
+        
+        if len(new_positions) <= 1:
+            return True
+        
+        
+        
+        
+        
+        has_neighbor = False
+        for dr, dc in self.get_directions():
+            neighbor = (next_pos[0] + dr, next_pos[1] + dc)
+            if neighbor != start_pos and neighbor in new_positions:
+                has_neighbor = True
+                break
+        
+        if not has_neighbor:
+            return False  
+            
+        
+        
+        
+        
+        
+        if start_pos in occupied_positions:
+            neighbors_of_start = 0
+            for dr, dc in self.get_directions():
+                neighbor = (start_pos[0] + dr, start_pos[1] + dc)
+                if neighbor in occupied_positions and neighbor != start_pos:
+                    neighbors_of_start += 1
+            
+            
+            
+            
+            
+            if neighbors_of_start == 1:
+                
+                
+                return self.is_connected(new_positions)
+        
+        
+        
+        return self.is_connected(new_positions)
+
+    def is_move_valid_with_cohesion(self, start_pos, next_pos, occupied_positions):
         """Check if a move maintains cohesion (cell connectivity)"""
         if not self.cohesion_mode.get():
             return True
             
-        # If moving to an adjacent position, always valid
-        if self.manhattan_dist(start_pos, next_pos) <= 1:
-            return True
-            
-        # Copy occupied positions and simulate the move
+        
+        
+        
+        
         new_occupied = set(occupied_positions)
-        new_occupied.remove(start_pos)
+        
+        
+        
+        if start_pos in new_occupied:
+            new_occupied.remove(start_pos)
+        
+        
+        
         new_occupied.add(next_pos)
         
-        # Check if all cells are still connected
-        if not self.is_connected(new_occupied):
-            return False
+        
+        
+        has_adjacent = False
+        directions = self.get_directions()
+        for dr, dc in directions:
+            neighbor = (next_pos[0] + dr, next_pos[1] + dc)
+            if neighbor != start_pos and neighbor in new_occupied:
+                has_adjacent = True
+                break
+        
+        if not has_adjacent and len(new_occupied) > 1:
+            return False  
             
-        return True
-    
-    def is_connected(self, positions):
+        
+        
+        
+        return self.is_connected(new_occupied)
         """Check if all cells in a set are connected"""
         if not positions:
             return True
             
-        # Use BFS to find all connected cells
+        
+        
         start = next(iter(positions))
         visited = {start}
         queue = deque([start])
@@ -1389,7 +1724,8 @@ class InteractiveGrid:
                     visited.add(neighbor)
                     queue.append(neighbor)
         
-        # If all positions were visited, the cells are connected
+        
+        
         return len(visited) == len(positions)
     
     def reset_grid(self):
@@ -1400,14 +1736,18 @@ class InteractiveGrid:
         self.status_var.set("Moving cells back to starting position...")
         self.temp_move_count = 0
         
-        # Get current active cells and target positions (bottom rows)
-        # Get current active cells and target positions (bottom rows)
+        
+        
+        
+        
         active_cells = [pos for pos, cell in self.cells.items() if cell["active"]]
         
-        # Create a list of target positions along the bottom rows
+        
+        
         target_positions = []
         
-        # Fill from bottom right corner (most efficient for reset)
+        
+        
         for row in range(self.grid_size - 1, -1, -1):
             for col in range(self.grid_size - 1, -1, -1):
                 pos = (row, col)
@@ -1419,7 +1759,8 @@ class InteractiveGrid:
         self.cells_requesting_help = set()
         self.help_response_cells = {}
         
-        # Find cells already in position
+        
+        
         cells_to_assign = []
         for pos in active_cells:
             if pos in target_positions:
@@ -1428,29 +1769,38 @@ class InteractiveGrid:
             else:
                 cells_to_assign.append(pos)
         
-        # Should never happen but just in case           
+        
+        
         if len(cells_to_assign) > len(target_positions):
             self.status_var.set("Error: More active cells than target positions")
             self.movement_in_progress = False
             self.form_button.config(state=tk.NORMAL)
             return
         
-        # Create cost matrix for assignment problem - prioritize bottom rows
+        
+        
         cost_matrix = []
         for cell_pos in cells_to_assign:
             row_costs = []
             for target_pos in target_positions:
-                # Primary goal is to move to bottom
-                row_priority = self.grid_size - target_pos[0]  # Higher for bottom rows
-                # Secondary goal is to minimize distance
+                
+                
+                row_priority = self.grid_size - target_pos[0]  
+                
+                
+                
                 distance = self.manhattan_dist(cell_pos, target_pos)
-                # Combined cost (weighted heavily toward bottom rows)
-                cost = distance + (row_priority * 100)  # Prioritize bottom rows strongly
+                
+                
+                cost = distance + (row_priority * 100)  
+                
                 row_costs.append(cost)
             cost_matrix.append(row_costs)
         
-        # Hungarian algorithm for optimal assignment would be better here
-        # But for simplicity, we'll use a greedy approach
+        
+        
+        
+        
         while cells_to_assign and target_positions:
             min_cost = float('inf')
             best_cell_idx = -1
@@ -1468,7 +1818,8 @@ class InteractiveGrid:
                 target_pos = target_positions[best_target_idx]
                 self.active_to_target_assignments[cell_pos] = target_pos
                 
-                # Remove assigned elements
+                
+                
                 cells_to_assign.pop(best_cell_idx)
                 target_positions.pop(best_target_idx)
                 cost_matrix.pop(best_cell_idx)
@@ -1478,13 +1829,15 @@ class InteractiveGrid:
         
         self.status_var.set(f"Moving {len(self.active_to_target_assignments)} cells back to starting position...")
         
-        # Reset performance metrics
+        
+        
         self.step_count = 0
         self.total_cost = 0
         self.start_time = time.time()
         self.update_metrics_display()
         
-        # No cells need to be moved
+        
+        
         if not self.active_to_target_assignments:
             self.status_var.set("Reset complete. Ready for new formation.")
             self.movement_in_progress = False
@@ -1504,14 +1857,17 @@ class InteractiveGrid:
             self.update_target_highlights()
             self.clear_help_indicators()
             
-            # Final metrics update
+            
+            
             self.update_metrics_display()
             return
         
-        # Get current positions of active cells
+        
+        
         occupied_positions = set(pos for pos, cell in self.cells.items() if cell["active"])
         
-        # Different movement strategies based on selected mode
+        
+        
         if self.movement_mode.get() == MOVEMENT_MODE_SEQUENTIAL:
             self.move_cells_sequential(occupied_positions, for_reset=True)
         elif self.movement_mode.get() == MOVEMENT_MODE_PARALLEL:
@@ -1519,7 +1875,8 @@ class InteractiveGrid:
         elif self.movement_mode.get() == MOVEMENT_MODE_ASYNC:
             self.move_cells_async(occupied_positions, for_reset=True)
         else:
-            # Default to parallel for reset (more efficient)
+            
+            
             self.move_cells_parallel(occupied_positions, for_reset=True)
     
     def quick_reset_grid(self):
@@ -1528,7 +1885,8 @@ class InteractiveGrid:
         self.movement_in_progress = False
         self.form_button.config(state=tk.NORMAL)
         
-        # Clear all active cells and cell numbers
+        
+        
         self.cell_numbers = {}
         for pos in self.cells:
             self.cells[pos]["active"] = False
@@ -1539,11 +1897,13 @@ class InteractiveGrid:
             else:
                 self.canvas.itemconfig(self.cells[pos]["rect"], fill=INACTIVE_COLOR)
         
-        # Set up initial active cells at the bottom of the grid
+        
+        
         active_count = 0
         self.next_cell_number = 1
         
-        # Start from bottom right for better distribution
+        
+        
         for row in range(self.grid_size - 1, -1, -1):
             for col in range(self.grid_size - 1, -1, -1):
                 pos = (row, col)
@@ -1562,7 +1922,8 @@ class InteractiveGrid:
         self.update_counter()
         self.update_target_highlights()
         
-        # Reset performance metrics
+        
+        
         self.step_count = 0
         self.total_cost = 0
         self.start_time = None
@@ -1597,13 +1958,15 @@ class InteractiveGrid:
         self.root.update()
         self.temp_move_count = 0
         
-        # Reset performance metrics and start timer
+        
+        
         self.step_count = 0
         self.total_cost = 0
         self.start_time = time.time()
         self.update_metrics_display()
         
-        # Get target positions based on selected shape
+        
+        
         target_positions = self.get_target_positions()
         
         if not target_positions:
@@ -1612,15 +1975,18 @@ class InteractiveGrid:
             self.form_button.config(state=tk.NORMAL)
             return
         
-        # Ensure we have exactly the right number of target positions
+        
+        
         if len(target_positions) > self.num_active_cells:
             target_positions = target_positions[:self.num_active_cells]
         elif len(target_positions) < self.num_active_cells:
-            # For custom shapes that might have fewer than 20 cells, add positions near the shape
+            
+            
             center_row = self.grid_size // 2 - 1
             center_col = self.grid_size // 2 - 1
             
-            # Find all empty cells surrounding the shape
+            
+            
             occupied = set(target_positions)
             candidates = []
             
@@ -1633,17 +1999,20 @@ class InteractiveGrid:
                             neighbor not in occupied):
                             candidates.append(neighbor)
                             
-            # Sort candidates by distance to center
+            
+            
             candidates.sort(key=lambda pos: abs(pos[0] - center_row) + abs(pos[1] - center_col))
             
-            # Add candidates until we have the right number of cells
+            
+            
             for candidate in candidates:
                 if len(target_positions) >= self.num_active_cells:
                     break
                 target_positions.append(candidate)
                 occupied.add(candidate)
             
-        # Check if any target positions overlap with obstacles
+        
+        
         obstacle_targets = [pos for pos in target_positions if pos in self.obstacles]
         if obstacle_targets:
             self.status_var.set(f"Error: {len(obstacle_targets)} target positions overlap with obstacles")
@@ -1651,7 +2020,8 @@ class InteractiveGrid:
             self.form_button.config(state=tk.NORMAL)
             return
             
-        # Identify cells already in position and those that need to move
+        
+        
         self.completed_targets = set()
         remaining_active = []
         remaining_targets = []
@@ -1666,10 +2036,12 @@ class InteractiveGrid:
             if pos not in self.completed_targets:
                 remaining_targets.append(pos)
         
-        # Sort target positions by priority (core positions first)
+        
+        
         ordered_targets = self.prioritize_targets(remaining_targets)
         
-        # Assign each active cell to a target position (greedy assignment)
+        
+        
         assignments = {}
         remaining_cells = remaining_active.copy()
         
@@ -1677,7 +2049,8 @@ class InteractiveGrid:
             if not remaining_cells:
                 break
             
-            # Find closest cell to this target
+            
+            
             closest_cell = min(remaining_cells, key=lambda cell: self.manhattan_dist(cell, target))
             assignments[closest_cell] = target
             remaining_cells.remove(closest_cell)
@@ -1689,57 +2062,70 @@ class InteractiveGrid:
     def prioritize_targets(self, targets):
         """Prioritize target positions based on the selected shape"""
         if self.selected_shape.get() == "rectangle":
-            # Rectangle prioritizes inside-out
+            
+            
             center_row = self.grid_size // 2 - 1
             center_col = self.grid_size // 2 - 1
             
-            # Calculate distance from center for each target
+            
+            
             return sorted(targets, key=lambda pos: abs(pos[0] - center_row) + abs(pos[1] - center_col))
             
         elif self.selected_shape.get() == "pyramid":
-            # Pyramid prioritizes top-down
+            
+            
             def pyramid_priority(pos):
-                # Lower row numbers (higher positions) get priority
-                return pos[0]  # Sort by row, with top rows first
+                
+                
+                return pos[0]  
+                
                 
             return sorted(targets, key=pyramid_priority)
             
         elif self.selected_shape.get() in ["diamond", "heart", "arrow"]:
-            # These shapes prioritize top-down and center-out
+            
+            
             center_row = self.grid_size // 2 - 1
             center_col = self.grid_size // 2 - 1
             
             def shape_priority(pos):
-                # Lower row numbers (higher positions) get priority first
+                
+                
                 row_priority = pos[0] * 10
-                # Then center-out horizontally
+                
+                
                 col_priority = abs(pos[1] - center_col)
                 return (row_priority, col_priority)
                 
             return sorted(targets, key=shape_priority)
             
         elif self.selected_shape.get() == "circle":
-            # Circle prioritizes inside-out
+            
+            
             center_row = self.grid_size // 2 - 1
             center_col = self.grid_size // 2 - 1
             return sorted(targets, key=lambda pos: abs(pos[0] - center_row) + abs(pos[1] - center_col))
             
         elif self.selected_shape.get() == "cross":
-            # Cross prioritizes center, then vertical, then horizontal
+            
+            
             center_row = self.grid_size // 2 - 1
             center_col = self.grid_size // 2 - 1
             
             def cross_priority(pos):
-                # Center gets priority
+                
+                
                 center_dist = abs(pos[0] - center_row) + abs(pos[1] - center_col)
-                # Vertical bar gets priority over horizontal
+                
+                
                 is_vertical = pos[1] == center_col + 1
                 return (center_dist, 0 if is_vertical else 1)
                 
             return sorted(targets, key=cross_priority)
             
         elif self.selected_shape.get() == "custom":
-            # For custom shapes, we use a simple distance from center heuristic
+            
+            
             center_row = self.grid_size // 2 - 1
             center_col = self.grid_size // 2 - 1
             
@@ -1758,23 +2144,28 @@ class InteractiveGrid:
             self.form_button.config(state=tk.NORMAL)
             self.clear_help_indicators()
             
-            # Final metrics update
+            
+            
             self.update_metrics_display()
             return
             
-        # Get current positions of active cells
+        
+        
         occupied_positions = set(pos for pos, cell in self.cells.items() if cell["active"])
         
-        # If coordination mode is enabled, update help requests and reassign stuck cells
+        
+        
         if self.coordination_mode.get():
             self.update_help_requests()
             self.reassign_stuck_cells()
         
-        # Increment step counter
+        
+        
         self.step_count += 1
         self.update_metrics_display()
         
-        # Different movement strategies based on selected mode
+        
+        
         if self.movement_mode.get() == MOVEMENT_MODE_SEQUENTIAL:
             self.move_cells_sequential(occupied_positions)
         elif self.movement_mode.get() == MOVEMENT_MODE_PARALLEL:
@@ -1782,43 +2173,51 @@ class InteractiveGrid:
         elif self.movement_mode.get() == MOVEMENT_MODE_ASYNC:
             self.move_cells_async(occupied_positions)
         else:
-            # Default to parallel
+            
+            
             self.move_cells_parallel(occupied_positions)
     
     def reassign_stuck_cells(self):
         """Reassign cells that have been stuck for too long"""
-        # Only do this in coordination mode
+        
+        
         if not self.coordination_mode.get():
             return
             
-        # Only reassign if we have cells requesting help for multiple steps
+        
+        
         if not self.cells_requesting_help:
             return
             
-        # Find available target positions that aren't assigned
+        
+        
         all_targets = set(self.get_target_positions())
         assigned_targets = set(self.active_to_target_assignments.values())
         available_targets = all_targets - assigned_targets - self.completed_targets
         
-        # If no available targets, we can't reassign
+        
+        
         if not available_targets:
             return
             
-        # For each stuck cell, try to find a better target
+        
+        
         for stuck_pos in list(self.cells_requesting_help):
             if stuck_pos not in self.active_to_target_assignments:
                 continue
                 
             current_target = self.active_to_target_assignments[stuck_pos]
             
-            # Find a new target that's easier to reach
+            
+            
             best_target = None
             best_distance = float('inf')
             
             occupied_positions = set(pos for pos, cell in self.cells.items() if cell["active"])
             
             for target_pos in available_targets:
-                # Check if we can find a path to this target
+                
+                
                 next_step = self.find_next_step(stuck_pos, target_pos, occupied_positions)
                 if next_step:
                     distance = self.manhattan_dist(stuck_pos, target_pos)
@@ -1826,18 +2225,20 @@ class InteractiveGrid:
                         best_distance = distance
                         best_target = target_pos
             
-            # If we found a better target, reassign
+            
+            
             if best_target:
                 self.status_var.set(f"Reassigning stuck cell to a new target")
                 self.active_to_target_assignments[stuck_pos] = best_target
                 available_targets.remove(best_target)
                 available_targets.add(current_target)
                 
-                # Remove from help requests (it has a new target now)
+                
+                
                 self.cells_requesting_help.remove(stuck_pos)
     
     def update_help_requests(self):
-        """Update which cells are requesting help and which cells can respond"""
+        """Improved help request handling to avoid infinite loops"""
         # Clear previous help indicators
         self.clear_help_indicators()
         
@@ -1848,16 +2249,41 @@ class InteractiveGrid:
         # Find cells that are stuck and need help
         occupied_positions = set(pos for pos, cell in self.cells.items() if cell["active"])
         
+        # Track stuck cells and how long they've been stuck
+        if not hasattr(self, 'stuck_cell_history'):
+            self.stuck_cell_history = {}
+        
+        # Update stuck cells
+        current_stuck_cells = set()
+        
         for start_pos, target_pos in self.active_to_target_assignments.items():
             # Check if this cell can move toward its target
             path = self.find_next_step(start_pos, target_pos, occupied_positions)
             
             if path is None:
                 # Cell is stuck - it needs help
-                self.cells_requesting_help.add(start_pos)
+                current_stuck_cells.add(start_pos)
                 
-                # Mark as requesting help (yellow)
-                self.canvas.itemconfig(self.cells[start_pos]["rect"], fill=HELP_REQUEST_COLOR)
+                # Update stuck history
+                if start_pos in self.stuck_cell_history:
+                    self.stuck_cell_history[start_pos] += 1
+                else:
+                    self.stuck_cell_history[start_pos] = 1
+                
+                # If the cell has been stuck for too long, mark it for help
+                if self.stuck_cell_history[start_pos] >= 3:
+                    self.cells_requesting_help.add(start_pos)
+                    # Mark as requesting help (yellow)
+                    self.canvas.itemconfig(self.cells[start_pos]["rect"], fill=HELP_REQUEST_COLOR)
+            else:
+                # Cell can move, reset its stuck history
+                if start_pos in self.stuck_cell_history:
+                    del self.stuck_cell_history[start_pos]
+        
+        # Remove cells that are no longer stuck from the history
+        for pos in list(self.stuck_cell_history.keys()):
+            if pos not in current_stuck_cells:
+                del self.stuck_cell_history[pos]
         
         # If there are cells requesting help, find cells that can help
         if self.cells_requesting_help:
@@ -1866,7 +2292,7 @@ class InteractiveGrid:
             # Update the UI to show helper cells
             for helper_pos, target_cells in helper_cells.items():
                 self.help_response_cells[helper_pos] = target_cells
-    
+
     def clear_help_indicators(self):
         """Clear all help indicators from the grid"""
         for pos in self.cells_requesting_help:
@@ -1877,7 +2303,7 @@ class InteractiveGrid:
         self.help_response_cells = {}
     
     def find_helper_cells(self, occupied_positions):
-        """Find cells that can help other cells by moving out of the way"""
+        """Improved helper cell identification to prevent infinite loops"""
         helper_cells = {}
         
         # For each cell requesting help
@@ -1889,35 +2315,61 @@ class InteractiveGrid:
             
             # Find cells that are blocking the path
             for active_pos in occupied_positions:
+                # Skip cells that are already stuck or are the stuck cell itself
                 if active_pos == stuck_pos or active_pos in self.cells_requesting_help:
                     continue
                 
                 # Check if this cell is close to the stuck cell's path
                 if self.is_blocking_path(active_pos, stuck_pos, stuck_target):
-                    if active_pos not in helper_cells:
-                        helper_cells[active_pos] = []
-                    helper_cells[active_pos].append(stuck_pos)
-        
+                    # Check if the helper can actually move
+                    can_move = False
+                    if active_pos in self.active_to_target_assignments:
+                        target = self.active_to_target_assignments[active_pos]
+                        # Check each direction to see if the cell can move
+                        for dr, dc in self.get_directions():
+                            neighbor = (active_pos[0] + dr, active_pos[1] + dc)
+                            if (0 <= neighbor[0] < self.grid_size and 
+                                0 <= neighbor[1] < self.grid_size and 
+                                neighbor not in occupied_positions and
+                                neighbor not in self.obstacles):
+                                # Check cohesion
+                                if not self.cohesion_mode.get() or self.is_move_valid_with_cohesion(
+                                    active_pos, neighbor, occupied_positions):
+                                    can_move = True
+                                    break
+                    
+                    # Only add as helper if it can actually move
+                    if can_move:
+                        if active_pos not in helper_cells:
+                            helper_cells[active_pos] = []
+                        helper_cells[active_pos].append(stuck_pos)
+            
         return helper_cells
+
     
     def is_blocking_path(self, blocker_pos, start_pos, target_pos):
         """Check if blocker_pos is potentially blocking the path from start_pos to target_pos"""
-        # Simple check: is blocker close to both the start and target?
+        
+        
         dist_to_start = self.manhattan_dist(blocker_pos, start_pos)
         dist_to_target = self.manhattan_dist(blocker_pos, target_pos)
         
-        # Is blocker between start and target?
+        
+        
         is_between = (min(start_pos[0], target_pos[0]) <= blocker_pos[0] <= max(start_pos[0], target_pos[0]) and
                      min(start_pos[1], target_pos[1]) <= blocker_pos[1] <= max(start_pos[1], target_pos[1]))
         
-        # Is blocker adjacent to start?
+        
+        
         is_adjacent = dist_to_start <= 2
         
-        # Is blocker close to the most direct path?
+        
+        
         direct_dist = self.manhattan_dist(start_pos, target_pos)
         total_dist = dist_to_start + dist_to_target
         
-        # The blocker is on or close to the direct path if the sum of distances is close to direct distance
+        
+        
         is_on_path = total_dist <= direct_dist + 2
         
         return (is_between and is_on_path) or is_adjacent
@@ -1926,20 +2378,26 @@ class InteractiveGrid:
         """Move one cell at a time, prioritizing by target position"""
         cells_to_move = {}
         
-        # First check for coordination mode
+        
+        
         if self.coordination_mode.get() and not for_reset:
-            # Check if we have helper cells and if they should move
+            
+            
             for helper_pos, target_cells in self.help_response_cells.items():
-                # Helper cells should move out of the way
+                
+                
                 next_step = self.find_clearing_move(helper_pos, occupied_positions)
                 if next_step:
                     cells_to_move[helper_pos] = next_step
-                    # Once we prioritize one helper, the rest will be handled in future iterations
+                    
+                    
                     break
         
-        # If no helper cells need to move, proceed with normal movement
+        
+        
         if not cells_to_move:
-            # Find next step for one cell with highest priority
+            
+            
             best_cell = None
             best_priority = float('inf')
             best_next_step = None
@@ -1950,46 +2408,58 @@ class InteractiveGrid:
                     del self.active_to_target_assignments[start_pos]
                     continue
                     
-                # Skip cells that are currently requesting help
+                
+                
                 if not for_reset and start_pos in self.cells_requesting_help:
                     continue
                 
-                # First try standard pathfinding
+                
+                
                 next_step = self.find_next_step(start_pos, target_pos, occupied_positions)
                 
-                # If that fails and we're doing a reset, try alternate pathfinding
+                
+                
                 if next_step is None and for_reset:
                     next_step = self.find_alternate_path(start_pos, target_pos, occupied_positions, self.obstacles)
                 
-                # Check cohesion constraints
+                
+                
                 if next_step and self.cohesion_mode.get():
                     if not self.is_move_valid_with_cohesion(start_pos, next_step, occupied_positions):
                         next_step = None
                 
                 if next_step:
-                    # Determine priority - lower is better
+                    
+                    
                     if for_reset:
-                        # For reset, prioritize cells heading to bottom rows
-                        priority = -target_pos[0]  # Negative so higher rows (larger indices) have higher priority
+                        
+                        
+                        priority = -target_pos[0]  
+                        
                     else:
-                        # For formation, use shape-specific priority
+                        
+                        
                         if self.selected_shape.get() == "rectangle":
-                            # Center positions get higher priority
+                            
+                            
                             center_row = self.grid_size // 2 - 1
                             center_col = self.grid_size // 2 - 1
                             priority = abs(target_pos[0] - center_row) + abs(target_pos[1] - center_col)
                         elif self.selected_shape.get() in ["pyramid", "diamond", "circle", "cross", "heart", "arrow"]:
-                            # Use common priority scheme for all shapes
+                            
+                            
                             center_row = self.grid_size // 2 - 1
                             center_col = self.grid_size // 2 - 1
                             priority = abs(target_pos[0] - center_row) + abs(target_pos[1] - center_col)
                         elif self.selected_shape.get() == "custom":
-                            # For custom, use distance from current position as priority
+                            
+                            
                             priority = self.manhattan_dist(start_pos, target_pos)
                         else:
                             priority = 999
                             
-                    # Adjust by distance - closer cells get priority
+                    
+                    
                     distance = self.manhattan_dist(start_pos, target_pos)
                     adjusted_priority = priority * 10 + distance
                     
@@ -1998,11 +2468,13 @@ class InteractiveGrid:
                         best_priority = adjusted_priority
                         best_next_step = next_step
         
-            # Move the highest priority cell
+            
+            
             if best_cell and best_next_step:
                 cells_to_move[best_cell] = best_next_step
         
-        # Execute moves
+        
+        
         if cells_to_move:
             self.execute_moves(cells_to_move)
             
@@ -2017,14 +2489,14 @@ class InteractiveGrid:
                 self.handle_deadlock()
     
     def find_clearing_move(self, cell_pos, occupied_positions):
-        """Find a move for a helper cell to clear the path"""
+        """Find a move for a helper cell that actually clears a path"""
         if cell_pos not in self.active_to_target_assignments:
             return None
             
         target_pos = self.active_to_target_assignments[cell_pos]
         
-        # Get all empty adjacent cells
-        empty_neighbors = []
+        # Get empty adjacent cells
+        candidate_moves = []
         directions = self.get_directions()
         
         for dr, dc in directions:
@@ -2040,46 +2512,50 @@ class InteractiveGrid:
             if self.cohesion_mode.get() and not self.is_move_valid_with_cohesion(cell_pos, neighbor, occupied_positions):
                 continue
                 
-            # Check if this move would help others
-            would_help = False
+            # Move should help at least one stuck cell
+            helped_cells = 0
             for stuck_pos in self.cells_requesting_help:
                 if stuck_pos not in self.active_to_target_assignments:
                     continue
                     
                 stuck_target = self.active_to_target_assignments[stuck_pos]
                 
-                # If moving here would stop blocking the path
+                # If moving here would clear the path
                 if not self.is_blocking_path(neighbor, stuck_pos, stuck_target):
-                    would_help = True
-                    break
+                    helped_cells += 1
             
-            if would_help:
-                # Prioritize moves that also get us closer to our target
-                dist = self.manhattan_dist(neighbor, target_pos)
-                empty_neighbors.append((neighbor, dist))
+            # Store the move and how many cells it helps
+            if helped_cells > 0:
+                # Also consider how good this move is for the helper cell itself
+                own_benefit = self.manhattan_dist(cell_pos, target_pos) - self.manhattan_dist(neighbor, target_pos)
+                candidate_moves.append((neighbor, helped_cells, own_benefit))
         
-        if empty_neighbors:
-            # Sort by distance to target (prefer moves that help us too)
-            empty_neighbors.sort(key=lambda x: x[1])
-            return empty_neighbors[0][0]
-            
+        if candidate_moves:
+            # Sort by number of cells helped (descending) and own benefit (descending)
+            candidate_moves.sort(key=lambda x: (-x[1], -x[2]))
+            return candidate_moves[0][0]
+                
         return None
     
     def move_cells_parallel(self, occupied_positions, for_reset=False):
         """Move multiple cells simultaneously in lockstep"""
         cells_to_move = {}
         
-        # First handle helpers in coordination mode
+        
+        
         if self.coordination_mode.get() and not for_reset:
-            # Process helper cells first
+            
+            
             for helper_pos, target_cells in self.help_response_cells.items():
                 next_step = self.find_clearing_move(helper_pos, occupied_positions)
                 if next_step:
                     cells_to_move[helper_pos] = next_step
         
-        # Then process regular cell movements
+        
+        
         for start_pos, target_pos in list(self.active_to_target_assignments.items()):
-            # Skip cells that already have a move planned
+            
+            
             if start_pos in cells_to_move:
                 continue
                 
@@ -2088,18 +2564,22 @@ class InteractiveGrid:
                 del self.active_to_target_assignments[start_pos]
                 continue
                 
-            # Skip cells that are requesting help if in coordination mode
+            
+            
             if not for_reset and self.coordination_mode.get() and start_pos in self.cells_requesting_help:
                 continue
                 
-            # First try standard pathfinding
+            
+            
             next_step = self.find_next_step(start_pos, target_pos, occupied_positions)
             
-            # If that fails and we're doing a reset, try alternate pathfinding
+            
+            
             if next_step is None and for_reset:
                 next_step = self.find_alternate_path(start_pos, target_pos, occupied_positions, self.obstacles)
             
-            # Check cohesion constraints
+            
+            
             if next_step and self.cohesion_mode.get():
                 if not self.is_move_valid_with_cohesion(start_pos, next_step, occupied_positions):
                     next_step = None
@@ -2107,7 +2587,8 @@ class InteractiveGrid:
             if next_step:
                 cells_to_move[start_pos] = next_step
         
-        # Resolve conflicts (multiple cells trying to move to the same location)
+        
+        
         self.resolve_conflicts_with_priority(cells_to_move, for_reset=for_reset)
         
         if cells_to_move:
@@ -2128,19 +2609,24 @@ class InteractiveGrid:
         cells_to_move = {}
         cell_priorities = {}
         
-        # First handle helpers in coordination mode
+        
+        
         if self.coordination_mode.get() and not for_reset:
-            # Process helper cells first with high priority
+            
+            
             for helper_pos, target_cells in self.help_response_cells.items():
                 next_step = self.find_clearing_move(helper_pos, occupied_positions)
                 if next_step:
                     cells_to_move[helper_pos] = next_step
-                    # Give helpers very high priority
+                    
+                    
                     cell_priorities[helper_pos] = 1000.0
         
-        # Calculate priority for each cell and determine next step
+        
+        
         for start_pos, target_pos in list(self.active_to_target_assignments.items()):
-            # Skip cells that already have a move planned
+            
+            
             if start_pos in cells_to_move:
                 continue
                 
@@ -2149,65 +2635,81 @@ class InteractiveGrid:
                 del self.active_to_target_assignments[start_pos]
                 continue
                 
-            # Skip cells that are requesting help if in coordination mode
+            
+            
             if not for_reset and self.coordination_mode.get() and start_pos in self.cells_requesting_help:
                 continue
                 
-            # First try standard pathfinding
+            
+            
             next_step = self.find_next_step(start_pos, target_pos, occupied_positions)
             
-            # If that fails and we're doing a reset, try alternate pathfinding
+            
+            
             if next_step is None and for_reset:
                 next_step = self.find_alternate_path(start_pos, target_pos, occupied_positions, self.obstacles)
             
-            # Check cohesion constraints
+            
+            
             if next_step and self.cohesion_mode.get():
                 if not self.is_move_valid_with_cohesion(start_pos, next_step, occupied_positions):
                     next_step = None
             
             if next_step:
-                # Calculate priority - higher value means higher priority
+                
+                
                 distance = self.manhattan_dist(start_pos, target_pos)
                 
                 if for_reset:
-                    # For reset, prioritize cells heading to bottom rows
-                    base_priority = self.grid_size + target_pos[0]  # Higher rows get priority
+                    
+                    
+                    base_priority = self.grid_size + target_pos[0]  
+                    
                 else:
-                    # For shape formation, prioritize based on target position
+                    
+                    
                     if self.selected_shape.get() in ["rectangle", "pyramid", "diamond", "circle", "cross", "heart", "arrow"]:
                         center_row = self.grid_size // 2 - 1
                         center_col = self.grid_size // 2 - 1
                         center_dist = abs(target_pos[0] - center_row) + abs(target_pos[1] - center_col)
-                        base_priority = max(1, 10 - center_dist)  # More priority to center positions
+                        base_priority = max(1, 10 - center_dist)  
+                        
                     else:
-                        base_priority = max(1, 10 - distance)  # More priority to cells closer to target
+                        base_priority = max(1, 10 - distance)  
+                        
                 
-                # Add random factor for asynchronous behavior
+                
+                
                 random_factor = random.uniform(0.8, 1.2)
                 priority = base_priority * random_factor
                 
                 cells_to_move[start_pos] = next_step
                 cell_priorities[start_pos] = priority
         
-        # Randomly select subset of cells to move based on their priority
+        
+        
         if cells_to_move:
-            # Determine how many cells to move (1 to all)
+            
+            
             max_moves = min(len(cells_to_move), max(1, len(cells_to_move) // 2))
             num_to_move = random.randint(1, max_moves)
             
-            # Select cells with highest priority
+            
+            
             selected_cells = dict(sorted(cell_priorities.items(), 
                                         key=lambda x: x[1], reverse=True)[:num_to_move])
             
             filtered_moves = {pos: cells_to_move[pos] for pos in selected_cells}
             
-            # Resolve any remaining conflicts
+            
+            
             self.resolve_conflicts_with_priority(filtered_moves, for_reset=for_reset)
             
             if filtered_moves:
                 self.execute_moves(filtered_moves)
                 
-                # Vary the callback time slightly for async effect
+                
+                
                 delay = int(self.speed_var.get() * random.uniform(0.8, 1.2))
                 
                 if for_reset:
@@ -2227,26 +2729,30 @@ class InteractiveGrid:
     
     def execute_moves(self, cells_to_move):
         """Execute the actual cell movements"""
-        # Track cost for this step
+        
+        
         step_cost = 0
         
         for start_pos, next_pos in cells_to_move.items():
             if start_pos not in self.active_to_target_assignments and start_pos not in self.help_response_cells:
                 continue
                 
-            # Calculate move cost
+            
+            
             dr = next_pos[0] - start_pos[0]
             dc = next_pos[1] - start_pos[1]
             move_cost = self.get_direction_cost(dr, dc)
             step_cost += move_cost
                 
-            # Update cell state
+            
+            
             self.cells[start_pos]["active"] = False
             self.canvas.itemconfig(self.cells[start_pos]["rect"], fill=INACTIVE_COLOR)
             self.cells[next_pos]["active"] = True
             self.canvas.itemconfig(self.cells[next_pos]["rect"], fill=ACTIVE_COLOR)
             
-            # Move cell number
+            
+            
             if start_pos in self.cell_numbers:
                 cell_num = self.cell_numbers[start_pos]
                 self.canvas.itemconfig(self.cell_number_text[start_pos], text="")
@@ -2254,7 +2760,8 @@ class InteractiveGrid:
                 self.canvas.itemconfig(self.cell_number_text[next_pos], text=str(cell_num))
                 del self.cell_numbers[start_pos]
                 
-            # Update target assignment
+            
+            
             if start_pos in self.active_to_target_assignments:
                 target = self.active_to_target_assignments[start_pos]
                 del self.active_to_target_assignments[start_pos]
@@ -2264,21 +2771,26 @@ class InteractiveGrid:
                 else:
                     self.active_to_target_assignments[next_pos] = target
             
-            # Update helper cell status
+            
+            
             if start_pos in self.help_response_cells:
                 helped_cells = self.help_response_cells[start_pos]
                 self.help_response_cells[next_pos] = helped_cells
                 del self.help_response_cells[start_pos]
             
-            # Update help request status if applicable
+            
+            
             if start_pos in self.cells_requesting_help:
                 self.cells_requesting_help.remove(start_pos)
-                # The cell will need to re-evaluate if it still needs help after moving
+                
+                
         
-        # Update total cost
+        
+        
         self.total_cost += step_cost
         
-        # Update status
+        
+        
         remaining = len(self.active_to_target_assignments)
         completed = len(self.completed_targets)
         mode_str = self.movement_mode.get().capitalize()
@@ -2289,7 +2801,8 @@ class InteractiveGrid:
         self.update_counter()
         self.update_metrics_display()
         
-        # Keep target highlights updated
+        
+        
         self.update_target_highlights()
     
     def resolve_conflicts_with_priority(self, cells_to_move, for_reset=False):
@@ -2303,45 +2816,55 @@ class InteractiveGrid:
 
         for dest, sources in destination_counts.items():
             if len(sources) > 1:
-                # For each conflict, select the cell with highest priority
+                
+                
                 prioritized_source = None
                 
-                # First check if any helper cells are involved (they get priority)
+                
+                
                 helper_sources = [s for s in sources if s in self.help_response_cells]
                 if helper_sources and not for_reset:
-                    # Prioritize helper with most cells depending on it
+                    
+                    
                     prioritized_source = max(helper_sources, 
                                           key=lambda s: len(self.help_response_cells.get(s, [])))
                 else:
-                    # Normal priority resolution
+                    
+                    
                     if for_reset:
-                        # For reset, prioritize cells heading toward bottom of grid
+                        
+                        
                         sources_with_priority = []
                         for source in sources:
                             if source in self.active_to_target_assignments:
                                 target = self.active_to_target_assignments[source]
-                                # Higher row indices get priority (cells moving toward bottom)
+                                
+                                
                                 priority = target[0]
                                 sources_with_priority.append((source, priority))
                         
                         if sources_with_priority:
-                            # Sort by highest row index
+                            
+                            
                             sources_with_priority.sort(key=lambda x: -x[1])
                             prioritized_source = sources_with_priority[0][0]
                     else:
-                        # For formation, prioritize by target position
+                        
+                        
                         highest_priority = float('inf')
                         for source in sources:
                             if source in self.active_to_target_assignments:
                                 target = self.active_to_target_assignments[source]
                                 
-                                # Different priority for different shapes
+                                
+                                
                                 if self.selected_shape.get() in ["rectangle", "pyramid", "diamond", "circle", "cross", "heart", "arrow"]:
                                     center_row = self.grid_size // 2 - 1
                                     center_col = self.grid_size // 2 - 1
                                     priority = abs(target[0] - center_row) + abs(target[1] - center_col)
                                 elif self.selected_shape.get() == "custom" and self.custom_shape:
-                                    # For custom, use index in custom shape or distance to center
+                                    
+                                    
                                     try:
                                         priority = self.custom_shape.index(target)
                                     except ValueError:
@@ -2349,20 +2872,23 @@ class InteractiveGrid:
                                         center_col = self.grid_size // 2 - 1
                                         priority = abs(target[0] - center_row) + abs(target[1] - center_col)
                                 else:
-                                    # Default priority based on distance to target
+                                    
+                                    
                                     priority = self.manhattan_dist(source, target)
                                 
                                 if priority < highest_priority:
                                     highest_priority = priority
                                     prioritized_source = source
                 
-                # If no priority-based decision, choose the cell closest to its target
+                
+                
                 if prioritized_source is None:
                     prioritized_source = min(sources, key=lambda s: 
                                             self.manhattan_dist(s, self.active_to_target_assignments[s]) 
                                             if s in self.active_to_target_assignments else float('inf'))
                 
-                # Remove all but the prioritized source from the moves list
+                
+                
                 for source in sources:
                     if source != prioritized_source:
                         del cells_to_move[source]
@@ -2383,11 +2909,13 @@ class InteractiveGrid:
             elif algorithm == ALGORITHM_BELLMAN_FORD:
                 return self.find_next_step_bellman_ford(start_pos, target_pos, occupied_positions)
             else:
-                # Default to A* if unknown algorithm
+                
+                
                 return self.find_next_step_astar(start_pos, target_pos, occupied_positions)
         except Exception as e:
             print(f"Error in pathfinding algorithm {algorithm}: {e}")
-            # Fall back to A* if there's an error
+            
+            
             return self.find_next_step_astar(start_pos, target_pos, occupied_positions)
     
     def find_next_step_astar(self, start_pos, target_pos, occupied_positions):
@@ -2397,7 +2925,8 @@ class InteractiveGrid:
         if start_pos == target_pos:
             return None
         
-        # Check if target is adjacent for faster resolution
+        
+        
         directions = self.get_directions()
         for dr, dc in directions:
             neighbor = (start_pos[0] + dr, start_pos[1] + dc)
@@ -2405,13 +2934,15 @@ class InteractiveGrid:
                 return neighbor
         
         open_list = []
-        heappush(open_list, (0, 0, start_pos))  # f_score, counter, position
+        heappush(open_list, (0, 0, start_pos))  
+        
         came_from = {}
         g_score = {start_pos: 0}
         f_score = {start_pos: self.manhattan_dist(start_pos, target_pos) * self.heuristic_weight.get()}
         closed_set = set()
         counter = 1
-        max_iterations = self.grid_size * self.grid_size * 3  # Increased iteration limit
+        max_iterations = self.grid_size * self.grid_size * 3  
+        
         iterations = 0
         
         while open_list and iterations < max_iterations:
@@ -2422,19 +2953,22 @@ class InteractiveGrid:
                 continue
                 
             if current == target_pos:
-                # Reconstruct path
+                
+                
                 path = []
                 while current in came_from:
                     path.append(current)
                     current = came_from[current]
                 path.reverse()
                 if path:
-                    return path[0]  # Return the first step in the path
+                    return path[0]  
+                    
                 return None
                 
             closed_set.add(current)
             
-            # Try all possible directions, prioritized by distance to target
+            
+            
             directions = self.get_directions()
             directions.sort(key=lambda d: self.manhattan_dist(
                 (current[0] + d[0], current[1] + d[1]), 
@@ -2444,18 +2978,22 @@ class InteractiveGrid:
             for dr, dc in directions:
                 neighbor = (current[0] + dr, current[1] + dc)
                 
-                # Skip if outside grid
+                
+                
                 if not (0 <= neighbor[0] < self.grid_size and 0 <= neighbor[1] < self.grid_size):
                     continue
                     
-                # Skip if already processed or occupied
+                
+                
                 if neighbor in closed_set or neighbor in occupied:
                     continue
                 
-                # Calculate movement cost (higher for diagonal)
+                
+                
                 move_cost = self.get_direction_cost(dr, dc)
                 
-                # Calculate new costs
+                
+                
                 tentative_g_score = g_score[current] + move_cost
                 
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
@@ -2463,18 +3001,21 @@ class InteractiveGrid:
                     g_score[neighbor] = tentative_g_score
                     h_score = self.manhattan_dist(neighbor, target_pos) * self.heuristic_weight.get()
                     
-                    # Add obstacle avoidance factor - penalize paths that go near obstacles
+                    
+                    
                     obstacle_penalty = 0
                     for obs_pos in self.obstacles:
                         dist_to_obstacle = self.manhattan_dist(neighbor, obs_pos)
-                        if dist_to_obstacle <= 2:  # Only consider nearby obstacles
+                        if dist_to_obstacle <= 2:  
+                            
                             obstacle_penalty += (2 - dist_to_obstacle) * 0.5
                     
                     f_score[neighbor] = tentative_g_score + h_score + obstacle_penalty
                     heappush(open_list, (f_score[neighbor], counter, neighbor))
                     counter += 1
         
-        # If no path found, try any valid move that gets closer to target
+        
+        
         best_neighbor = None
         best_distance = float('inf')
         current_distance = self.manhattan_dist(start_pos, target_pos)
@@ -2491,7 +3032,8 @@ class InteractiveGrid:
                 best_distance = dist
                 best_neighbor = neighbor
         
-        # Only return a neighbor if it gets us closer to the target
+        
+        
         if best_neighbor and best_distance < current_distance:
             return best_neighbor
                 
@@ -2504,7 +3046,8 @@ class InteractiveGrid:
         if start_pos == target_pos:
             return None
         
-        # Check if target is adjacent for faster resolution
+        
+        
         directions = self.get_directions()
         for dr, dc in directions:
             neighbor = (start_pos[0] + dr, start_pos[1] + dc)
@@ -2512,9 +3055,11 @@ class InteractiveGrid:
                 return neighbor
         
         open_list = []
-        # Use modified heuristic that includes obstacle avoidance
+        
+        
         initial_h = self.manhattan_dist(start_pos, target_pos) * self.heuristic_weight.get()
-        heappush(open_list, (initial_h, 0, start_pos))  # h_score, counter, position
+        heappush(open_list, (initial_h, 0, start_pos))  
+        
         came_from = {}
         closed_set = set()
         counter = 1
@@ -2529,19 +3074,22 @@ class InteractiveGrid:
                 continue
                 
             if current == target_pos:
-                # Reconstruct path
+                
+                
                 path = []
                 while current in came_from:
                     path.append(current)
                     current = came_from[current]
                 path.reverse()
                 if path:
-                    return path[0]  # Return the first step in the path
+                    return path[0]  
+                    
                 return None
                 
             closed_set.add(current)
             
-            # Examine neighbors, prioritized by distance to target
+            
+            
             directions = self.get_directions()
             directions.sort(key=lambda d: self.manhattan_dist(
                 (current[0] + d[0], current[1] + d[1]), 
@@ -2551,20 +3099,24 @@ class InteractiveGrid:
             for dr, dc in directions:
                 neighbor = (current[0] + dr, current[1] + dc)
                 
-                # Skip if outside grid
+                
+                
                 if not (0 <= neighbor[0] < self.grid_size and 0 <= neighbor[1] < self.grid_size):
                     continue
                     
-                # Skip if already processed or occupied
+                
+                
                 if neighbor in closed_set or neighbor in occupied:
                     continue
                 
-                # Only update if we haven't seen this neighbor before
+                
+                
                 if neighbor not in came_from:
                     came_from[neighbor] = current
                     h_score = self.manhattan_dist(neighbor, target_pos) * self.heuristic_weight.get()
                     
-                    # Add obstacle avoidance
+                    
+                    
                     obstacle_penalty = 0
                     for obs_pos in self.obstacles:
                         dist_to_obstacle = self.manhattan_dist(neighbor, obs_pos)
@@ -2574,7 +3126,8 @@ class InteractiveGrid:
                     heappush(open_list, (h_score + obstacle_penalty, counter, neighbor))
                     counter += 1
         
-        # If no path found, try direct moves toward target
+        
+        
         best_neighbor = None
         best_distance = float('inf')
         current_distance = self.manhattan_dist(start_pos, target_pos)
@@ -2591,7 +3144,8 @@ class InteractiveGrid:
                 best_distance = dist
                 best_neighbor = neighbor
                 
-        # Only return a neighbor if it gets us closer to the target
+        
+        
         if best_neighbor and best_distance < current_distance:
             return best_neighbor
                 
@@ -2604,7 +3158,8 @@ class InteractiveGrid:
         if start_pos == target_pos:
             return None
         
-        # Check if target is adjacent for faster resolution
+        
+        
         directions = self.get_directions()
         for dr, dc in directions:
             neighbor = (start_pos[0] + dr, start_pos[1] + dc)
@@ -2612,7 +3167,8 @@ class InteractiveGrid:
                 return neighbor
         
         open_list = []
-        heappush(open_list, (0, 0, start_pos))  # distance, counter, position
+        heappush(open_list, (0, 0, start_pos))  
+        
         came_from = {}
         distance = {start_pos: 0}
         counter = 1
@@ -2623,22 +3179,26 @@ class InteractiveGrid:
             iterations += 1
             curr_dist, _, current = heappop(open_list)
             
-            # Skip if we already found a better path
+            
+            
             if curr_dist > distance.get(current, float('inf')):
                 continue
                 
             if current == target_pos:
-                # Reconstruct path
+                
+                
                 path = []
                 while current in came_from:
                     path.append(current)
                     current = came_from[current]
                 path.reverse()
                 if path:
-                    return path[0]  # Return the first step in the path
+                    return path[0]  
+                    
                 return None
             
-            # Examine neighbors, prioritized by distance to target
+            
+            
             directions = self.get_directions()
             directions.sort(key=lambda d: self.manhattan_dist(
                 (current[0] + d[0], current[1] + d[1]), 
@@ -2648,27 +3208,33 @@ class InteractiveGrid:
             for dr, dc in directions:
                 neighbor = (current[0] + dr, current[1] + dc)
                 
-                # Skip if outside grid
+                
+                
                 if not (0 <= neighbor[0] < self.grid_size and 0 <= neighbor[1] < self.grid_size):
                     continue
                     
-                # Skip if occupied
+                
+                
                 if neighbor in occupied:
                     continue
                 
-                # Movement cost (higher for diagonal)
+                
+                
                 move_cost = self.get_direction_cost(dr, dc)
                 
-                # Base cost
+                
+                
                 edge_cost = move_cost
                 
-                # Add obstacle avoidance - make cells near obstacles more "expensive"
+                
+                
                 for obs_pos in self.obstacles:
                     dist_to_obstacle = self.manhattan_dist(neighbor, obs_pos)
                     if dist_to_obstacle <= 2:
                         edge_cost += (2 - dist_to_obstacle) * 0.5
                 
-                # Calculate new distance
+                
+                
                 new_dist = distance[current] + edge_cost
                 
                 if neighbor not in distance or new_dist < distance[neighbor]:
@@ -2677,7 +3243,8 @@ class InteractiveGrid:
                     heappush(open_list, (new_dist, counter, neighbor))
                     counter += 1
         
-        # If no path found, try to make a direct move towards the target
+        
+        
         best_neighbor = None
         best_distance = float('inf')
         current_distance = self.manhattan_dist(start_pos, target_pos)
@@ -2694,7 +3261,8 @@ class InteractiveGrid:
                 best_distance = dist
                 best_neighbor = neighbor
                 
-        # Only return a neighbor if it gets us closer to the target
+        
+        
         if best_neighbor and best_distance < current_distance:
             return best_neighbor
             
@@ -2707,14 +3275,16 @@ class InteractiveGrid:
         if start_pos == target_pos:
             return None
         
-        # Check if target is adjacent for faster resolution
+        
+        
         directions = self.get_directions()
         for dr, dc in directions:
             neighbor = (start_pos[0] + dr, start_pos[1] + dc)
             if neighbor == target_pos and neighbor not in occupied:
                 return neighbor
         
-        queue = deque([(start_pos, [])])  # (position, path)
+        queue = deque([(start_pos, [])])  
+        
         visited = {start_pos}
         max_iterations = self.grid_size * self.grid_size * 2
         iterations = 0
@@ -2725,27 +3295,32 @@ class InteractiveGrid:
             
             if current == target_pos:
                 if path:
-                    return path[0]  # Return the first step in the path
+                    return path[0]  
+                    
                 return None
             
-            # Examine neighbors, prioritized by distance to target
+            
+            
             directions = self.get_directions()
             neighbors = []
             
             for dr, dc in directions:
                 neighbor = (current[0] + dr, current[1] + dc)
                 
-                # Skip if outside grid
+                
+                
                 if not (0 <= neighbor[0] < self.grid_size and 0 <= neighbor[1] < self.grid_size):
                     continue
                     
-                # Skip if already visited or occupied
+                
+                
                 if neighbor in visited or neighbor in occupied:
                     continue
                     
                 neighbors.append(neighbor)
             
-            # Sort neighbors by distance to target for better BFS performance
+            
+            
             neighbors.sort(key=lambda pos: self.manhattan_dist(pos, target_pos))
             
             for neighbor in neighbors:
@@ -2753,7 +3328,8 @@ class InteractiveGrid:
                 new_path = path + [neighbor]
                 queue.append((neighbor, new_path))
         
-        # If no path found, try to make a direct move towards the target
+        
+        
         best_neighbor = None
         best_distance = float('inf')
         current_distance = self.manhattan_dist(start_pos, target_pos)
@@ -2770,7 +3346,8 @@ class InteractiveGrid:
                 best_distance = dist
                 best_neighbor = neighbor
                 
-        # Only return a neighbor if it gets us closer to the target
+        
+        
         if best_neighbor and best_distance < current_distance:
             return best_neighbor
                 
@@ -2778,21 +3355,25 @@ class InteractiveGrid:
     
     def find_next_step_bellman_ford(self, start_pos, target_pos, occupied_positions):
         """Improved Bellman-Ford Algorithm"""
-        # This is a simplified version that's more compatible with grid-based movement
+        
+        
         occupied = {pos for pos in occupied_positions if pos != start_pos} | self.obstacles
         
         if start_pos == target_pos:
             return None
         
-        # Check if target is adjacent for faster resolution
+        
+        
         directions = self.get_directions()
         for dr, dc in directions:
             neighbor = (start_pos[0] + dr, start_pos[1] + dc)
             if neighbor == target_pos and neighbor not in occupied:
                 return neighbor
         
-        # Create graph of valid positions (not occupied by obstacles or other cells)
-        # Limit search area to improve performance
+        
+        
+        
+        
         search_radius = 6
         vertices = set()
         for r in range(max(0, start_pos[0] - search_radius), min(self.grid_size, start_pos[0] + search_radius + 1)):
@@ -2801,26 +3382,31 @@ class InteractiveGrid:
                 if pos not in occupied or pos == target_pos or pos == start_pos:
                     vertices.add(pos)
         
-        # Add target to ensure it's included
+        
+        
         if target_pos not in vertices:
             vertices.add(target_pos)
         
-        # Initialize distances and predecessors
+        
+        
         distance = {vertex: float('inf') for vertex in vertices}
         distance[start_pos] = 0
         predecessor = {vertex: None for vertex in vertices}
         
-        # Build edge list
+        
+        
         edges = []
         for vertex in vertices:
             r, c = vertex
             for dr, dc in directions:
                 neighbor = (r + dr, c + dc)
                 if neighbor in vertices:
-                    # Cost is 1.0 for cardinal, 1.414 for diagonal
+                    
+                    
                     cost = self.get_direction_cost(dr, dc)
                     
-                    # Add obstacle avoidance
+                    
+                    
                     for obs_pos in self.obstacles:
                         dist_to_obstacle = self.manhattan_dist(neighbor, obs_pos)
                         if dist_to_obstacle <= 2:
@@ -2828,9 +3414,12 @@ class InteractiveGrid:
                             
                     edges.append((vertex, neighbor, cost))
         
-        # Bellman-Ford algorithm
-        # Relax edges repeatedly
-        for i in range(min(len(vertices) - 1, 10)):  # Limit iterations for performance
+        
+        
+        
+        
+        for i in range(min(len(vertices) - 1, 10)):  
+            
             updated = False
             for u, v, w in edges:
                 if distance[u] != float('inf') and distance[u] + w < distance[v]:
@@ -2838,13 +3427,16 @@ class InteractiveGrid:
                     predecessor[v] = u
                     updated = True
             
-            # If no updates were made, exit early
+            
+            
             if not updated:
                 break
         
-        # Reconstruct path from target to start
+        
+        
         if distance[target_pos] == float('inf'):
-            # No path found, make a greedy move
+            
+            
             best_neighbor = None
             best_distance = float('inf')
             current_distance = self.manhattan_dist(start_pos, target_pos)
@@ -2861,11 +3453,13 @@ class InteractiveGrid:
                     best_distance = dist
                     best_neighbor = neighbor
                     
-            # Only return a neighbor if it gets us closer to the target
+            
+            
             if best_neighbor and best_distance < current_distance:
                 return best_neighbor
         else:
-            # Path found, reconstruct it
+            
+            
             path = []
             current = target_pos
             while current != start_pos:
@@ -2877,7 +3471,8 @@ class InteractiveGrid:
             path.reverse()
             
             if path:
-                return path[0]  # Return the first step in the path
+                return path[0]  
+                
                 
         return None
     
@@ -2900,18 +3495,21 @@ class InteractiveGrid:
             
         print(f"Deadlock resolution attempt #{self.deadlock_count}")
         
-        # Update help requests in coordination mode
+        
+        
         if self.coordination_mode.get():
             self.update_help_requests()
             self.reassign_stuck_cells()
             
-            # If we have helper cells and stuck cells, try moving them
+            
+            
             if self.help_response_cells:
                 self.status_var.set("Using coordinated movement to resolve deadlock...")
                 self.pending_callback = self.root.after(self.speed_var.get(), self.move_cells)
                 return
         
-        # Try different strategies to resolve deadlock
+        
+        
         if self.try_temporary_moves():
             self.status_var.set("Making temporary moves to clear paths...")
             self.pending_callback = self.root.after(self.speed_var.get(), self.move_cells)
@@ -2927,19 +3525,22 @@ class InteractiveGrid:
             self.pending_callback = self.root.after(self.speed_var.get(), self.move_cells)
             return
             
-        # Enhanced deadlock resolution for obstacles
+        
+        
         if self.try_obstacle_path_clearing():
             self.status_var.set("Clearing path around obstacles...")
             self.pending_callback = self.root.after(self.speed_var.get(), self.move_cells)
             return
             
-        # If coordination mode is enabled, try to coordinate a multi-cell movement
+        
+        
         if self.coordination_mode.get() and self.try_multi_cell_movement():
             self.status_var.set("Coordinating multi-cell movement to resolve deadlock...")
             self.pending_callback = self.root.after(self.speed_var.get(), self.move_cells)
             return
             
-        # Give up after multiple attempts
+        
+        
         if self.deadlock_count < 5:      
             self.status_var.set(f"Deadlock persists, trying again (attempt {self.deadlock_count})...")
             self.pending_callback = self.root.after(self.speed_var.get(), self.move_cells)
@@ -2968,13 +3569,15 @@ class InteractiveGrid:
             self.pending_callback = self.root.after(self.speed_var.get(), self.move_cells_to_reset)
             return
             
-        # Enhanced deadlock resolution for obstacles during reset
+        
+        
         if self.try_obstacle_path_clearing(for_reset=True):
             self.status_var.set("Clearing path around obstacles during reset...")
             self.pending_callback = self.root.after(self.speed_var.get(), self.move_cells_to_reset)
             return
             
-        # Special handling for severe deadlocks - move multiple cells at once
+        
+        
         if self.try_multi_cell_movement(for_reset=True):
             self.status_var.set("Attempting coordinated multi-cell movement...")
             self.pending_callback = self.root.after(self.speed_var.get(), self.move_cells_to_reset)
@@ -2985,7 +3588,8 @@ class InteractiveGrid:
     
     def try_obstacle_path_clearing(self, for_reset=False):
         """Try to clear paths around obstacles that may be causing deadlocks"""
-        # Find active cells that are stuck near obstacles
+        
+        
         active_positions = [pos for pos, cell in self.cells.items() if cell["active"]]
         obstacle_adjacent_cells = []
         
@@ -2993,7 +3597,8 @@ class InteractiveGrid:
             if pos not in self.active_to_target_assignments:
                 continue
                 
-            # Check if this cell is adjacent to an obstacle
+            
+            
             directions = self.get_directions()
             for dr, dc in directions:
                 neighbor = (pos[0] + dr, pos[1] + dc)
@@ -3006,7 +3611,8 @@ class InteractiveGrid:
         if not obstacle_adjacent_cells:
             return False
             
-        # Try to move other cells to clear paths
+        
+        
         occupied_positions = set(pos for pos, cell in self.cells.items() if cell["active"])
         
         for stuck_pos in obstacle_adjacent_cells:
@@ -3015,20 +3621,24 @@ class InteractiveGrid:
                 
             target_pos = self.active_to_target_assignments[stuck_pos]
             
-            # Look for cells that might be blocking the path
+            
+            
             cells_to_move = []
             
-            # Simple approach: try to move cells that are between the stuck cell and its target
+            
+            
             for pos in active_positions:
                 if pos == stuck_pos:
                     continue
                     
-                # Check if this cell is between stuck_pos and target_pos
+                
+                
                 if (min(stuck_pos[0], target_pos[0]) <= pos[0] <= max(stuck_pos[0], target_pos[0]) and
                     min(stuck_pos[1], target_pos[1]) <= pos[1] <= max(stuck_pos[1], target_pos[1])):
                     cells_to_move.append(pos)
             
-            # Try to move these cells
+            
+            
             for blocking_pos in cells_to_move:
                 if self.move_blocking_cell(blocking_pos):
                     return True
@@ -3037,7 +3647,8 @@ class InteractiveGrid:
     
     def try_multi_cell_movement(self, for_reset=False):
         """Try to move multiple cells in a coordinated fashion to resolve severe deadlocks"""
-        # This is an advanced deadlock resolution strategy for when normal strategies fail
+        
+        
         active_cells = [pos for pos, cell in self.cells.items() if cell["active"]]
         empty_spaces = []
         
@@ -3050,7 +3661,8 @@ class InteractiveGrid:
         if not empty_spaces:
             return False
             
-        # Prioritize cells for movement
+        
+        
         priority_cells = []
         for pos in active_cells:
             if pos not in self.active_to_target_assignments:
@@ -3059,7 +3671,8 @@ class InteractiveGrid:
             target = self.active_to_target_assignments[pos]
             distance = self.manhattan_dist(pos, target)
             
-            # Consider how "stuck" the cell is - count blocked neighbors
+            
+            
             blocked_neighbors = 0
             directions = self.get_directions()
             for dr, dc in directions:
@@ -3071,16 +3684,20 @@ class InteractiveGrid:
             
             priority_cells.append((pos, distance, blocked_neighbors))
         
-        # Sort cells by priority (most stuck and furthest from target first)
+        
+        
         priority_cells.sort(key=lambda x: (-x[2], -x[1]))
         
-        # Try to move up to 3 cells at once to break severe deadlocks
+        
+        
         cells_moved = 0
-        for pos, _, _ in priority_cells[:5]:  # Try top 5 priority cells
+        for pos, _, _ in priority_cells[:5]:  
+            
             if cells_moved >= 3:
                 break
                 
-            # Try to find any move for this cell
+            
+            
             for empty_pos in empty_spaces:
                 directions = self.get_directions()
                 is_adjacent = False
@@ -3091,11 +3708,13 @@ class InteractiveGrid:
                         break
                 
                 if is_adjacent:
-                    # Check cohesion constraints
+                    
+                    
                     if self.cohesion_mode.get() and not self.is_move_valid_with_cohesion(pos, empty_pos, set(active_cells)):
                         continue
                         
-                    # Execute the move
+                    
+                    
                     self.cells[pos]["active"] = False
                     self.canvas.itemconfig(self.cells[pos]["rect"], fill=INACTIVE_COLOR)
                     self.cells[empty_pos]["active"] = True
@@ -3139,7 +3758,8 @@ class InteractiveGrid:
                               if cell["active"] and pos not in self.completed_targets 
                               and pos in self.active_to_target_assignments]
                               
-        # First, try to move cells that are one step away from their targets
+        
+        
         close_cells = [(pos, target) for pos, target in active_with_targets 
                       if target and self.manhattan_dist(pos, target) == 1]
                       
@@ -3150,7 +3770,8 @@ class InteractiveGrid:
                         self.temp_move_count += 1
                         return True
         
-        # Try arbitrary moves that might help
+        
+        
         for pos, target in active_with_targets:
             if target:
                 directions = self.get_directions()
@@ -3166,10 +3787,12 @@ class InteractiveGrid:
                     if neighbor in self.completed_targets:
                         continue
                         
-                    if neighbor in self.obstacles:  # Skip obstacle cells
+                    if neighbor in self.obstacles:  
+                        
                         continue
                         
-                    # Check cohesion constraints
+                    
+                    
                     occupied_positions = set(p for p, cell in self.cells.items() if cell["active"])
                     if self.cohesion_mode.get() and not self.is_move_valid_with_cohesion(pos, neighbor, occupied_positions):
                         continue
@@ -3177,7 +3800,8 @@ class InteractiveGrid:
                     current_dist = self.manhattan_dist(pos, target)
                     new_dist = self.manhattan_dist(neighbor, target)
                     
-                    # Accept moves that get us closer or occasionally allow sideways moves
+                    
+                    
                     if new_dist < current_dist or (new_dist == current_dist and self.temp_move_count > 5):
                         self.cells[pos]["active"] = False
                         self.canvas.itemconfig(self.cells[pos]["rect"], fill=INACTIVE_COLOR)
@@ -3214,10 +3838,12 @@ class InteractiveGrid:
         if not empty_positions:
             return False
             
-        # Find cells stuck between obstacles and other cells
+        
+        
         active_cells = [pos for pos, cell in self.cells.items() if cell["active"]]
         
-        # Sort by how "stuck" they are - cells with fewer free neighbors get priority
+        
+        
         stuck_cells = []
         
         for pos in active_cells:
@@ -3236,22 +3862,27 @@ class InteractiveGrid:
             
             stuck_cells.append((pos, free_neighbors))
             
-        # Sort by fewest free neighbors
+        
+        
         stuck_cells.sort(key=lambda x: x[1])
         
-        # Try to move the most stuck cells first
+        
+        
         for pos, _ in stuck_cells:
-            # Find the best empty position to move to
+            
+            
             if pos in self.active_to_target_assignments:
                 target = self.active_to_target_assignments[pos]
                 
-                # Sort empty positions by how much closer they get to the target
+                
+                
                 valid_moves = []
                 directions = self.get_directions()
                 for empty_pos in empty_positions:
                     for dr, dc in directions:
                         if (pos[0] + dr, pos[1] + dc) == empty_pos:
-                            # Check cohesion constraints
+                            
+                            
                             occupied_positions = set(p for p, cell in self.cells.items() if cell["active"])
                             if self.cohesion_mode.get() and not self.is_move_valid_with_cohesion(pos, empty_pos, occupied_positions):
                                 continue
@@ -3262,13 +3893,15 @@ class InteractiveGrid:
                             valid_moves.append((empty_pos, improvement))
                             break
                 
-                # Consider both improvements and any valid moves
+                
+                
                 valid_moves.sort(key=lambda x: x[1], reverse=True)
                 
                 if valid_moves:
                     empty_pos = valid_moves[0][0]
                     
-                    # Execute move
+                    
+                    
                     self.cells[pos]["active"] = False
                     self.canvas.itemconfig(self.cells[pos]["rect"], fill=INACTIVE_COLOR)
                     self.cells[empty_pos]["active"] = True
@@ -3286,7 +3919,8 @@ class InteractiveGrid:
                     self.active_to_target_assignments[empty_pos] = target
                     return True
             
-        # If we couldn't find priority-based moves, try any valid move
+        
+        
         for pos in active_cells:
             directions = self.get_directions()
             for dr, dc in directions:
@@ -3298,15 +3932,18 @@ class InteractiveGrid:
                 if neighbor in [p for p, cell in self.cells.items() if cell["active"]]:
                     continue
                     
-                if neighbor in self.obstacles:  # Skip obstacle cells
+                if neighbor in self.obstacles:  
+                    
                     continue
                     
-                # Check cohesion constraints
+                
+                
                 occupied_positions = set(p for p, cell in self.cells.items() if cell["active"])
                 if self.cohesion_mode.get() and not self.is_move_valid_with_cohesion(pos, neighbor, occupied_positions):
                     continue
                     
-                # Execute move
+                
+                
                 self.cells[pos]["active"] = False
                 self.canvas.itemconfig(self.cells[pos]["rect"], fill=INACTIVE_COLOR)
                 self.cells[neighbor]["active"] = True
@@ -3329,7 +3966,8 @@ class InteractiveGrid:
     
     def move_blocking_cell(self, blocking_pos):
         """Move a cell that's blocking another cell's path"""
-        # Find empty spaces that this cell can move to
+        
+        
         empty_neighbors = []
         directions = self.get_directions()
         
@@ -3342,13 +3980,15 @@ class InteractiveGrid:
             if neighbor in [p for p, cell in self.cells.items() if cell["active"]]:
                 continue
                 
-            if neighbor in self.obstacles:  # Skip obstacle cells
+            if neighbor in self.obstacles:  
+                
                 continue
                 
             if neighbor in self.completed_targets:
                 continue
                 
-            # Check cohesion constraints
+            
+            
             occupied_positions = set(p for p, cell in self.cells.items() if cell["active"])
             if self.cohesion_mode.get() and not self.is_move_valid_with_cohesion(blocking_pos, neighbor, occupied_positions):
                 continue
@@ -3358,12 +3998,14 @@ class InteractiveGrid:
         if not empty_neighbors:
             return False
             
-        # If this is a cell with a target, prioritize moves that get closer to the target
+        
+        
         if blocking_pos in self.active_to_target_assignments:
             target = self.active_to_target_assignments[blocking_pos]
             empty_neighbors.sort(key=lambda pos: self.manhattan_dist(pos, target))
         
-        # Move to best empty neighbor
+        
+        
         next_pos = empty_neighbors[0]
         
         self.cells[blocking_pos]["active"] = False
@@ -3405,25 +4047,30 @@ class InteractiveGrid:
         if not empty_spaces:
             return False
             
-        # Try to make a useful move for any cell
+        
+        
         for cell_pos in active_cells:
             if cell_pos in self.active_to_target_assignments:
                 target_pos = self.active_to_target_assignments[cell_pos]
                 
-                # Sort empty positions by distance to target
+                
+                
                 empty_spaces.sort(key=lambda pos: self.manhattan_dist(pos, target_pos))
                 
                 for empty_pos in empty_spaces:
-                    # Check if the empty position is adjacent
+                    
+                    
                     directions = self.get_directions()
                     for dr, dc in directions:
                         if (cell_pos[0] + dr, cell_pos[1] + dc) == empty_pos:
-                            # Check cohesion constraints
+                            
+                            
                             occupied_positions = set(p for p, cell in self.cells.items() if cell["active"])
                             if self.cohesion_mode.get() and not self.is_move_valid_with_cohesion(cell_pos, empty_pos, occupied_positions):
                                 continue
                                 
-                            # Make the move
+                            
+                            
                             self.cells[cell_pos]["active"] = False
                             self.canvas.itemconfig(self.cells[cell_pos]["rect"], fill=INACTIVE_COLOR)
                             self.cells[empty_pos]["active"] = True
@@ -3441,7 +4088,8 @@ class InteractiveGrid:
                             self.active_to_target_assignments[empty_pos] = target
                             return True
                         
-        # If no useful moves found, try any random valid move
+        
+        
         random.shuffle(active_cells)
         for cell_pos in active_cells:
             directions = self.get_directions()
@@ -3452,12 +4100,14 @@ class InteractiveGrid:
                     not self.cells[neighbor]["active"] and 
                     neighbor not in self.obstacles):
                     
-                    # Check cohesion constraints
+                    
+                    
                     occupied_positions = set(p for p, cell in self.cells.items() if cell["active"])
                     if self.cohesion_mode.get() and not self.is_move_valid_with_cohesion(cell_pos, neighbor, occupied_positions):
                         continue
                         
-                    # Make the move
+                    
+                    
                     self.cells[cell_pos]["active"] = False
                     self.canvas.itemconfig(self.cells[cell_pos]["rect"], fill=INACTIVE_COLOR)
                     self.cells[neighbor]["active"] = True
@@ -3489,14 +4139,18 @@ class ShapeDesignerWindow:
         
         self.window = tk.Toplevel(parent)
         self.window.title("Custom Shape Designer")
-        self.window.transient(parent)  # Make window modal
+        self.window.transient(parent)  
         
-        # Canvas for shape drawing
-        self.cell_size = min(30, 600 // grid_size)  # Smaller cells for the designer
+        
+        
+        
+        self.cell_size = min(30, 600 // grid_size)  
+        
         canvas_width = grid_size * self.cell_size
         canvas_height = grid_size * self.cell_size
         
-        # Add scrollbars for large grids
+        
+        
         canvas_frame = tk.Frame(self.window)
         canvas_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
@@ -3523,7 +4177,8 @@ class ShapeDesignerWindow:
         counter_label = tk.Label(control_frame, textvariable=self.counter_var)
         counter_label.pack(side=tk.LEFT, padx=10)
         
-        # Draw grid
+        
+        
         self.cells = {}
         for row in range(grid_size):
             for col in range(grid_size):
@@ -3532,13 +4187,15 @@ class ShapeDesignerWindow:
                 rect = self.canvas.create_rectangle(x1, y1, x2, y2, fill="white", outline="black")
                 self.cells[(row, col)] = rect
                 
-                # Add center marker
+                
+                
                 if row == grid_size // 2 - 1 and col == grid_size // 2 - 1:
                     self.canvas.create_text(x1 + self.cell_size/2, y1 + self.cell_size/2, 
                                            text="C", fill="gray")
         
         self.canvas.bind("<Button-1>", self.on_canvas_click)
-        self.canvas.bind("<B1-Motion>", self.on_canvas_drag)  # Support drag selection
+        self.canvas.bind("<B1-Motion>", self.on_canvas_drag)  
+        
         
         button_frame = tk.Frame(self.window)
         button_frame.pack(pady=10)
@@ -3552,7 +4209,8 @@ class ShapeDesignerWindow:
         self.cancel_button = tk.Button(button_frame, text="Cancel", command=self.window.destroy)
         self.cancel_button.pack(side=tk.LEFT, padx=10)
         
-        # Add some template shape buttons
+        
+        
         template_frame = tk.Frame(self.window)
         template_frame.pack(pady=10)
         
@@ -3571,7 +4229,8 @@ class ShapeDesignerWindow:
             tk.Button(template_frame, text=text, command=command).pack(side=tk.LEFT, padx=5)
     
     def on_canvas_click(self, event):
-        # Convert click coordinates to grid position
+        
+        
         canvas_x = self.canvas.canvasx(event.x)
         canvas_y = self.canvas.canvasy(event.y)
         col = int(canvas_x // self.cell_size)
@@ -3580,12 +4239,14 @@ class ShapeDesignerWindow:
         if 0 <= row < self.grid_size and 0 <= col < self.grid_size:
             pos = (row, col)
             
-            # Toggle cell selection
+            
+            
             if pos in self.selected_cells:
                 self.selected_cells.remove(pos)
                 self.canvas.itemconfig(self.cells[pos], fill="white")
             else:
-                # Limit to 20 cells
+                
+                
                 if len(self.selected_cells) >= 20:
                     return
                     
@@ -3604,9 +4265,11 @@ class ShapeDesignerWindow:
         if 0 <= row < self.grid_size and 0 <= col < self.grid_size:
             pos = (row, col)
             
-            # Add cell if not already selected
+            
+            
             if pos not in self.selected_cells:
-                # Limit to 20 cells
+                
+                
                 if len(self.selected_cells) >= 20:
                     return
                     
@@ -3625,7 +4288,8 @@ class ShapeDesignerWindow:
             messagebox.showwarning("Invalid Shape", f"Please select exactly 20 cells. Current count: {len(self.selected_cells)}")
             return
             
-        # Call the callback with the selected cells
+        
+        
         self.on_shape_created(list(self.selected_cells))
         self.window.destroy()
     
@@ -3633,40 +4297,50 @@ class ShapeDesignerWindow:
         """Create a star-shaped template"""
         self.clear_all()
         
-        # Define star shape centered in the grid
+        
+        
         center_row = self.grid_size // 2 - 1
         center_col = self.grid_size // 2 - 1
         
-        # Star points and body
+        
+        
         star_shape = [
-            # Center
+            
+            
             (center_row, center_col),
             
-            # Top point
+            
+            
             (center_row - 3, center_col),
             (center_row - 2, center_col),
             
-            # Upper right point
+            
+            
             (center_row - 1, center_col + 3),
             (center_row - 1, center_col + 2),
             
-            # Lower right point
+            
+            
             (center_row + 2, center_col + 2),
             (center_row + 1, center_col + 1),
             
-            # Lower point
+            
+            
             (center_row + 3, center_col),
             (center_row + 2, center_col),
             
-            # Lower left point
+            
+            
             (center_row + 2, center_col - 2),
             (center_row + 1, center_col - 1),
             
-            # Upper left point
+            
+            
             (center_row - 1, center_col - 3),
             (center_row - 1, center_col - 2),
             
-            # Fill in additional cells to reach 20
+            
+            
             (center_row, center_col + 1),
             (center_row, center_col - 1),
             (center_row + 1, center_col),
@@ -3676,8 +4350,10 @@ class ShapeDesignerWindow:
             (center_row + 1, center_col - 2)
         ]
         
-        # Add cells to selection
-        for pos in star_shape[:20]:  # Ensure we don't exceed 20 cells
+        
+        
+        for pos in star_shape[:20]:  
+            
             if 0 <= pos[0] < self.grid_size and 0 <= pos[1] < self.grid_size:
                 self.selected_cells.add(pos)
                 self.canvas.itemconfig(self.cells[pos], fill="blue")
@@ -3688,41 +4364,51 @@ class ShapeDesignerWindow:
         """Create a heart-shaped template"""
         self.clear_all()
         
-        # Define heart shape centered in the grid
+        
+        
         center_row = self.grid_size // 2 - 1
         center_col = self.grid_size // 2 - 1
         
         heart_shape = []
         
-        # Top curved part (two circles side by side)
-        # Left bump
+        
+        
+        
+        
         heart_shape.append((center_row - 3, center_col - 1))
         heart_shape.append((center_row - 4, center_col - 1))
         heart_shape.append((center_row - 4, center_col))
         
-        # Right bump
+        
+        
         heart_shape.append((center_row - 3, center_col + 3))
         heart_shape.append((center_row - 4, center_col + 3))
         heart_shape.append((center_row - 4, center_col + 2))
         
-        # Top center
+        
+        
         heart_shape.append((center_row - 3, center_col + 1))
         heart_shape.append((center_row - 3, center_col))
         heart_shape.append((center_row - 3, center_col + 2))
         
-        # Middle section
+        
+        
         for c in range(center_col - 2, center_col + 5):
             heart_shape.append((center_row - 2, c))
         
-        # Bottom tapered section
+        
+        
         for c in range(center_col - 1, center_col + 4):
             heart_shape.append((center_row - 1, c))
         
-        # Point
+        
+        
         heart_shape.append((center_row, center_col + 1))
         
-        # Add cells to selection
-        for pos in heart_shape[:20]:  # Ensure we don't exceed 20 cells
+        
+        
+        for pos in heart_shape[:20]:  
+            
             if 0 <= pos[0] < self.grid_size and 0 <= pos[1] < self.grid_size:
                 self.selected_cells.add(pos)
                 self.canvas.itemconfig(self.cells[pos], fill="blue")
@@ -3733,22 +4419,27 @@ class ShapeDesignerWindow:
         """Create a plus/cross-shaped template"""
         self.clear_all()
         
-        # Define plus shape centered in the grid
+        
+        
         center_row = self.grid_size // 2 - 1
         center_col = self.grid_size // 2 - 1
         
         plus_shape = []
         
-        # Vertical bar
+        
+        
         for r in range(center_row - 4, center_row + 5):
             plus_shape.append((r, center_col))
         
-        # Horizontal bar
+        
+        
         for c in range(center_col - 4, center_col + 5):
-            if c != center_col:  # Skip center (already counted)
+            if c != center_col:  
+                
                 plus_shape.append((center_row, c))
         
-        # Add cells to selection (up to 20)
+        
+        
         for pos in plus_shape[:20]:
             if 0 <= pos[0] < self.grid_size and 0 <= pos[1] < self.grid_size:
                 self.selected_cells.add(pos)
@@ -3760,34 +4451,41 @@ class ShapeDesignerWindow:
         """Create an arrow-shaped template"""
         self.clear_all()
         
-        # Define arrow shape centered in the grid
+        
+        
         center_row = self.grid_size // 2 - 1
         center_col = self.grid_size // 2 - 1
         
         arrow_shape = []
         
-        # Arrow head (pointing up)
-        arrow_shape.append((center_row - 4, center_col + 1))  # Tip
         
-        # Second row of head
+        
+        arrow_shape.append((center_row - 4, center_col + 1))  
+        
+        
+        
+        
         arrow_shape.append((center_row - 3, center_col))
         arrow_shape.append((center_row - 3, center_col + 1))
         arrow_shape.append((center_row - 3, center_col + 2))
         
-        # Third row (wider)
+        
+        
         arrow_shape.append((center_row - 2, center_col - 1))
         arrow_shape.append((center_row - 2, center_col))
         arrow_shape.append((center_row - 2, center_col + 1))
         arrow_shape.append((center_row - 2, center_col + 2))
         arrow_shape.append((center_row - 2, center_col + 3))
         
-        # Shaft
+        
+        
         for r in range(center_row - 1, center_row + 4):
             arrow_shape.append((r, center_col))
             arrow_shape.append((r, center_col + 1))
             arrow_shape.append((r, center_col + 2))
         
-        # Add cells to selection (up to 20)
+        
+        
         for pos in arrow_shape[:20]:
             if 0 <= pos[0] < self.grid_size and 0 <= pos[1] < self.grid_size:
                 self.selected_cells.add(pos)
@@ -3804,29 +4502,36 @@ class ShapeDesignerWindow:
         
         diamond_shape = []
         
-        # Row 1 (top) - 1 cell
+        
+        
         diamond_shape.append((center_row - 4, center_col + 1))
         
-        # Row 2 - 3 cells
+        
+        
         for c in range(center_col, center_col + 3):
             diamond_shape.append((center_row - 3, c))
         
-        # Row 3 - 5 cells
+        
+        
         for c in range(center_col - 1, center_col + 4):
             diamond_shape.append((center_row - 2, c))
         
-        # Row 4 - 5 cells
+        
+        
         for c in range(center_col - 1, center_col + 4):
             diamond_shape.append((center_row - 1, c))
         
-        # Row 5 - 3 cells
+        
+        
         for c in range(center_col, center_col + 3):
             diamond_shape.append((center_row, c))
         
-        # Row 6 (bottom) - 1 cell
+        
+        
         diamond_shape.append((center_row + 1, center_col + 1))
         
-        # Add cells to selection (up to 20)
+        
+        
         for pos in diamond_shape[:20]:
             if 0 <= pos[0] < self.grid_size and 0 <= pos[1] < self.grid_size:
                 self.selected_cells.add(pos)
@@ -3841,26 +4546,32 @@ class ShapeDesignerWindow:
         center_row = self.grid_size // 2 - 1
         center_col = self.grid_size // 2 - 1
         
-        # Calculate positions approximating a circle
+        
+        
         positions = []
         
-        # Define a reference circle
+        
+        
         radius = 2.5
         for r in range(center_row - 4, center_row + 5):
             for c in range(center_col - 4, center_col + 5):
-                # Calculate distance from center
+                
+                
                 dr = r - center_row
                 dc = c - center_col
                 distance = (dr*dr + dc*dc) ** 0.5
                 
-                # Add if within radius
+                
+                
                 if distance <= radius:
                     positions.append((r, c))
         
-        # Sort by distance from center to ensure we get the most "circle-like" cells
+        
+        
         positions.sort(key=lambda pos: abs((pos[0] - center_row)**2 + (pos[1] - center_col)**2 - radius**2))
         
-        # Add cells to selection (up to 20)
+        
+        
         for pos in positions[:20]:
             if 0 <= pos[0] < self.grid_size and 0 <= pos[1] < self.grid_size:
                 self.selected_cells.add(pos)
