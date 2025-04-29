@@ -13,8 +13,8 @@ class EvolutionaryTrainer:
     Implements an evolutionary algorithm to train cells for efficient shape formation.
     """
 
-    def __init__(self, grid_size, target_shape, obstacles=None,
-                 population_size=50, genome_size=8, max_generations=100):
+    def __init__(self, grid_size, target_shape, obstacles=None, start_positions=None,
+                 population_size=50, genome_size=8, max_generations=100, mutation_rate=0.05, app=None):
         """
         Initialize the evolutionary trainer.
 
@@ -22,17 +22,35 @@ class EvolutionaryTrainer:
             grid_size (int): Size of the grid
             target_shape (list): List of (row, col) positions representing the target shape
             obstacles (set): Set of (row, col) positions with obstacles
+            start_positions (list): Optional list of starting positions for cells
             population_size (int): Number of individuals in the population
             genome_size (int): Size of the genome for each individual
             max_generations (int): Maximum number of generations to run
+            mutation_rate (float): Probability of mutation for each gene
+            app: Reference to the main application (for storing history)
         """
         self.grid_size = grid_size
         self.target_shape = target_shape
         self.obstacles = obstacles if obstacles is not None else set()
+        self.start_positions = start_positions
 
         self.population_size = population_size
         self.genome_size = genome_size
         self.max_generations = max_generations
+        self.mutation_rate = mutation_rate
+        self.app = app
+
+        # Randomization flags
+        self.randomize_shapes = True
+        self.randomize_obstacles = True
+
+        # Randomization intervals (generations)
+        self.shape_interval = 20
+        self.obstacle_interval = 10
+
+        # Included shapes and obstacles for randomization
+        self.included_shapes = ["Rectangle", "Circle", "Cross", "Heart", "Arrow"]
+        self.included_obstacles = ["Random", "Border", "Maze", "Scattered", "Wall with Gap"]
 
         # Create initial population
         self.population = [Individual(genome_size=genome_size) for _ in range(population_size)]
@@ -116,14 +134,32 @@ class EvolutionaryTrainer:
         # This is a simplified simulation for demonstration
         # In a real implementation, this would use the actual simulation
 
-        # Initialize cells at random positions
+        # Initialize cells at custom positions if provided, otherwise random
         active_cells = set()
-        while len(active_cells) < len(self.target_shape):
-            row = random.randint(0, self.grid_size - 1)
-            col = random.randint(0, self.grid_size - 1)
-            pos = (row, col)
-            if pos not in active_cells and pos not in self.obstacles:
-                active_cells.add(pos)
+
+        if self.start_positions and len(self.start_positions) > 0:
+            # Use custom starting positions
+            for pos in self.start_positions:
+                if len(active_cells) >= len(self.target_shape):
+                    break
+                if pos not in active_cells and pos not in self.obstacles:
+                    active_cells.add(pos)
+
+            # If we don't have enough positions, fill the rest randomly
+            while len(active_cells) < len(self.target_shape):
+                row = random.randint(0, self.grid_size - 1)
+                col = random.randint(0, self.grid_size - 1)
+                pos = (row, col)
+                if pos not in active_cells and pos not in self.obstacles:
+                    active_cells.add(pos)
+        else:
+            # Initialize cells at random positions
+            while len(active_cells) < len(self.target_shape):
+                row = random.randint(0, self.grid_size - 1)
+                col = random.randint(0, self.grid_size - 1)
+                pos = (row, col)
+                if pos not in active_cells and pos not in self.obstacles:
+                    active_cells.add(pos)
 
         # Assign targets to cells (simplified)
         target_list = list(self.target_shape)
@@ -404,10 +440,10 @@ class EvolutionaryTrainer:
         num_cells = len(self.target_shape)
 
         for generation in range(self.max_generations):
-            # Change obstacles every 10 generations (except generation 0)
-            if generation > 0 and generation % 10 == 0:
+            # Change obstacles based on the obstacle_interval (except generation 0) if randomize_obstacles is enabled
+            if self.randomize_obstacles and generation > 0 and generation % self.obstacle_interval == 0:
                 # Create new obstacles
-                new_obstacles = create_random_obstacles(self.grid_size, len(self.obstacles), self.target_shape)
+                new_obstacles = self._create_random_obstacles(len(self.obstacles), self.target_shape)
 
                 # Update obstacles
                 self.obstacles = new_obstacles
@@ -426,13 +462,13 @@ class EvolutionaryTrainer:
                 if hasattr(self, 'ui_window'):
                     self.ui_window.update()
 
-            # Change target shape every 20 generations (except generation 0)
-            if generation > 0 and generation % 20 == 0:
+            # Change target shape based on the shape_interval (except generation 0) if randomize_shapes is enabled
+            if self.randomize_shapes and generation > 0 and generation % self.shape_interval == 0:
                 # Create new target shape
-                new_target_shape = create_random_shape(self.grid_size, num_cells)
+                new_target_shape = self._create_random_shape(num_cells)
 
                 # Ensure obstacles don't overlap with new target shape
-                new_obstacles = create_random_obstacles(self.grid_size, len(self.obstacles), new_target_shape)
+                new_obstacles = self._create_random_obstacles(len(self.obstacles), new_target_shape)
 
                 # Update target shape and obstacles
                 self.target_shape = new_target_shape
@@ -478,12 +514,30 @@ class EvolutionaryTrainer:
             if self.best_individual is None or best_individual.fitness > self.best_individual.fitness:
                 self.best_individual = best_individual
 
+                # Visualize the best individual's movement for this generation
+                if self.show_viz_var.get():
+                    self.viz_info_var.set(f"Visualizing best individual from generation {generation + 1}")
+                    strategy = best_individual.get_movement_strategy()
+                    # Run a quick simulation to visualize the movement
+                    self._visualize_movement(strategy)
+
+            # Store history in the main app if available
+            if self.app is not None:
+                # Store the training history in the main app
+                if hasattr(self.app, 'best_fitness_history'):
+                    self.app.best_fitness_history = self.best_fitness_history.copy()
+                if hasattr(self.app, 'avg_fitness_history'):
+                    self.app.avg_fitness_history = self.avg_fitness_history.copy()
+                # Store the best individual in the main app
+                if hasattr(self.app, 'best_individual'):
+                    self.app.best_individual = self.best_individual
+
             # Update plot
             self._update_plot()
 
             # Create next generation (except for the last iteration)
             if generation < self.max_generations - 1:
-                self.population = self.create_next_generation()
+                self.population = self.create_next_generation(mutation_rate=self.mutation_rate)
 
             # Process UI events
             if self.ui_window:
@@ -730,77 +784,356 @@ class EvolutionaryTrainer:
                 self.best_time_label.config(text=f"Best Time: {self.best_individual.time_taken:.2f}s")
                 self.best_accuracy_label.config(text=f"Best Accuracy: {self.best_individual.shape_accuracy:.2f}")
 
-def create_random_obstacles(grid_size, num_obstacles, target_shape):
-    """
-    Create random obstacles that don't overlap with the target shape.
+    def _create_random_shape(self, num_cells):
+        """
+        Create a random target shape with the specified number of cells.
+        Uses one of the included shape types.
 
-    Args:
-        grid_size (int): Size of the grid
-        num_obstacles (int): Number of obstacles to create
-        target_shape (list): List of (row, col) positions representing the target shape
+        Args:
+            num_cells (int): Number of cells in the shape
 
-    Returns:
-        set: Set of (row, col) positions with obstacles
-    """
-    target_set = set(target_shape)
-    obstacles = set()
+        Returns:
+            list: List of (row, col) positions representing the target shape
+        """
+        # If no shapes are included or only Custom is included (which we can't generate),
+        # fall back to the default random shape generation
+        valid_shapes = [s for s in self.included_shapes if s != "Custom"]
+        if not valid_shapes:
+            return self._create_default_random_shape(num_cells)
 
-    while len(obstacles) < num_obstacles:
-        row = random.randint(0, grid_size - 1)
-        col = random.randint(0, grid_size - 1)
-        pos = (row, col)
+        # Choose a random shape type from the included shapes
+        shape_type = random.choice(valid_shapes)
+        print(f"Creating random shape of type: {shape_type}")
 
-        if pos not in target_set and pos not in obstacles:
-            obstacles.add(pos)
+        # Create the shape based on the selected type
+        center_row = self.grid_size // 2
+        center_col = self.grid_size // 2
+        shape = []
 
-    return obstacles
+        if shape_type == "Rectangle":
+            # Create a rectangle shape
+            for r in range(center_row - 2, center_row + 3):
+                for c in range(center_col - 2, center_col + 3):
+                    # Skip corners for a more interesting shape
+                    if (r == center_row - 2 and c == center_col - 2) or \
+                       (r == center_row - 2 and c == center_col + 2) or \
+                       (r == center_row + 2 and c == center_col - 2) or \
+                       (r == center_row + 2 and c == center_col + 2):
+                        continue
+                    shape.append((r, c))
 
-def create_random_shape(grid_size, num_cells):
-    """
-    Create a random target shape with the specified number of cells.
+        elif shape_type == "Circle":
+            # Create a circle shape
+            radius = 3
+            for r in range(center_row - radius, center_row + radius + 1):
+                for c in range(center_col - radius, center_col + radius + 1):
+                    # Use distance formula to determine if point is in circle
+                    distance = ((r - center_row) ** 2 + (c - center_col) ** 2) ** 0.5
+                    if distance <= radius and 0 <= r < self.grid_size and 0 <= c < self.grid_size:
+                        shape.append((r, c))
 
-    Args:
-        grid_size (int): Size of the grid
-        num_cells (int): Number of cells in the shape
+        elif shape_type == "Cross":
+            # Create a cross shape
+            size = 5
+            for r in range(center_row - size // 2, center_row + size // 2 + 1):
+                shape.append((r, center_col))
+            for c in range(center_col - size // 2, center_col + size // 2 + 1):
+                if (center_row, c) not in shape:  # Avoid duplicating the center point
+                    shape.append((center_row, c))
 
-    Returns:
-        list: List of (row, col) positions representing the target shape
-    """
-    shape = []
+        elif shape_type == "Heart":
+            # Create a heart shape (simplified)
+            heart_points = [
+                (0, 1), (0, 2), (1, 0), (1, 3), (2, 0), (2, 3),
+                (3, 1), (3, 2), (4, 2), (5, 3), (6, 2), (7, 1),
+                (7, 0), (6, -1), (5, -2), (4, -1), (3, 0)
+            ]
+            for r, c in heart_points:
+                new_r = center_row + r - 3
+                new_c = center_col + c - 1
+                if 0 <= new_r < self.grid_size and 0 <= new_c < self.grid_size:
+                    shape.append((new_r, new_c))
 
-    # Start with a random center point
-    center_row = random.randint(grid_size // 4, 3 * grid_size // 4)
-    center_col = random.randint(grid_size // 4, 3 * grid_size // 4)
+        elif shape_type == "Arrow":
+            # Create an arrow shape pointing right
+            arrow_points = [
+                (0, 0), (0, 1), (0, 2), (0, 3), (0, 4),  # Shaft
+                (-1, 2), (-2, 3),  # Upper wing
+                (1, 2), (2, 3),    # Lower wing
+                (-1, 5), (0, 6), (1, 5)  # Arrowhead
+            ]
+            for r, c in arrow_points:
+                new_r = center_row + r
+                new_c = center_col + c - 3
+                if 0 <= new_r < self.grid_size and 0 <= new_c < self.grid_size:
+                    shape.append((new_r, new_c))
 
-    # Add the center point to the shape
-    shape.append((center_row, center_col))
+        # If we somehow didn't generate any valid positions, fall back to default
+        if not shape:
+            return self._create_default_random_shape(num_cells)
 
-    # Add adjacent cells until we reach the desired number
-    while len(shape) < num_cells:
-        # Pick a random cell from the current shape
-        base_cell = random.choice(shape)
+        # Ensure we have exactly num_cells
+        if len(shape) > num_cells:
+            # If we have too many cells, randomly select num_cells
+            shape = random.sample(shape, num_cells)
+        elif len(shape) < num_cells:
+            # If we have too few cells, add adjacent cells until we reach num_cells
+            return self._add_cells_to_shape(shape, num_cells)
 
-        # Try to add an adjacent cell
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        random.shuffle(directions)
+        return shape
 
-        for dr, dc in directions:
-            new_row = base_cell[0] + dr
-            new_col = base_cell[1] + dc
-            new_pos = (new_row, new_col)
+    def _create_default_random_shape(self, num_cells):
+        """
+        Create a default random shape by growing from a center point.
 
-            # Check if the position is valid and not already in the shape
-            if (0 <= new_row < grid_size and
-                0 <= new_col < grid_size and
-                new_pos not in shape):
-                shape.append(new_pos)
+        Args:
+            num_cells (int): Number of cells in the shape
+
+        Returns:
+            list: List of (row, col) positions representing the target shape
+        """
+        shape = []
+
+        # Start with a random center point
+        center_row = random.randint(self.grid_size // 4, 3 * self.grid_size // 4)
+        center_col = random.randint(self.grid_size // 4, 3 * self.grid_size // 4)
+
+        # Add the center point to the shape
+        shape.append((center_row, center_col))
+
+        # Add adjacent cells until we reach the desired number
+        return self._add_cells_to_shape(shape, num_cells)
+
+    def _add_cells_to_shape(self, shape, num_cells):
+        """
+        Add cells to a shape until it reaches the desired number.
+
+        Args:
+            shape (list): Current shape to add cells to
+            num_cells (int): Target number of cells
+
+        Returns:
+            list: Expanded shape with num_cells cells
+        """
+        while len(shape) < num_cells:
+            # Pick a random cell from the current shape
+            base_cell = random.choice(shape)
+
+            # Try to add an adjacent cell
+            directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+            random.shuffle(directions)
+
+            for dr, dc in directions:
+                new_row = base_cell[0] + dr
+                new_col = base_cell[1] + dc
+                new_pos = (new_row, new_col)
+
+                # Check if the position is valid and not already in the shape
+                if (0 <= new_row < self.grid_size and
+                    0 <= new_col < self.grid_size and
+                    new_pos not in shape):
+                    shape.append(new_pos)
+                    break
+
+        return shape[:num_cells]  # Ensure we have exactly num_cells
+
+    def _visualize_movement(self, strategy):
+        """
+        Visualize the movement of cells using the given strategy.
+
+        Args:
+            strategy (dict): Movement strategy parameters
+        """
+        # Create a simulation environment
+        from simulation_environment import SimulationEnvironment
+
+        sim_env = SimulationEnvironment(
+            grid_size=self.grid_size,
+            target_shape=self.target_shape,
+            obstacles=self.obstacles,
+            num_cells=len(self.target_shape)
+        )
+
+        # Initialize cells with the strategy and custom starting positions if available
+        if self.start_positions and len(self.start_positions) > 0:
+            sim_env.initialize_cells_with_positions(strategy, self.start_positions)
+        else:
+            sim_env.initialize_cells(strategy)
+
+        # Get initial positions
+        initial_positions = sim_env.cell_positions.copy()
+
+        # Draw initial state
+        self._draw_grid(initial_positions)
+        self.viz_info_var.set(f"Initial positions")
+        self.ui_window.update()
+        time.sleep(0.5)  # Pause to show initial state
+
+        # Run simulation step by step
+        max_steps = 50  # Limit to prevent infinite loops
+        step = 0
+        sim_env.simulation_complete = False
+
+        while step < max_steps and not sim_env.simulation_complete:
+            # Make one step
+            sim_env._step_simulation()
+            sim_env._check_completion()  # Check if simulation is complete
+            step += 1
+
+            # Draw current state
+            self._draw_grid(sim_env.cell_positions)
+
+            # Count active cells (cells not at their targets)
+            active_cells = 0
+            for cell_id, target in sim_env.cell_targets.items():
+                if sim_env.cell_positions[cell_id] != target:
+                    active_cells += 1
+
+            self.viz_info_var.set(f"Step {step}: {active_cells} active cells")
+            self.ui_window.update()
+
+            # Adjust speed based on slider
+            delay = 1.0 - self.viz_speed_var.get()  # Invert so higher value = faster
+            time.sleep(max(0.05, delay * 0.5))  # At least 0.05 seconds delay
+
+            # Stop if all cells have reached their targets
+            if sim_env.simulation_complete:
                 break
 
-        # If we couldn't add an adjacent cell, try a different base cell
-        # This is a simple approach - a more sophisticated approach would use
-        # backtracking or other algorithms to ensure we can always create a valid shape
+        # Show final state
+        self._draw_grid(sim_env.cell_positions)
+        self.viz_info_var.set(f"Movement complete in {step} steps")
+        self.ui_window.update()
 
-    return shape[:num_cells]  # Ensure we have exactly num_cells
+    def _create_random_obstacles(self, num_obstacles, target_shape):
+        """
+        Create random obstacles that don't overlap with the target shape.
+        Uses one of the included obstacle patterns.
+
+        Args:
+            num_obstacles (int): Number of obstacles to create
+            target_shape (list): List of (row, col) positions representing the target shape
+
+        Returns:
+            set: Set of (row, col) positions with obstacles
+        """
+        # If no obstacle patterns are included or only Custom is included (which we can't generate),
+        # fall back to the default random obstacle generation
+        valid_obstacles = [o for o in self.included_obstacles if o != "Custom"]
+        if not valid_obstacles:
+            return self._create_default_random_obstacles(num_obstacles, target_shape)
+
+        # Choose a random obstacle pattern from the included patterns
+        pattern = random.choice(valid_obstacles)
+        print(f"Creating random obstacles with pattern: {pattern}")
+
+        obstacles = set()
+        target_set = set(target_shape)
+
+        if pattern == "Random":
+            # Create random scattered obstacles
+            return self._create_default_random_obstacles(num_obstacles, target_shape)
+
+        elif pattern == "Border":
+            # Create a border of obstacles
+            for r in range(self.grid_size):
+                for c in range(self.grid_size):
+                    # Add obstacles along the border
+                    if r == 0 or r == self.grid_size - 1 or c == 0 or c == self.grid_size - 1:
+                        pos = (r, c)
+                        if pos not in target_set and len(obstacles) < num_obstacles:
+                            obstacles.add(pos)
+
+        elif pattern == "Maze":
+            # Create a simple maze pattern
+            for r in range(2, self.grid_size - 2, 3):
+                for c in range(1, self.grid_size - 1):
+                    pos = (r, c)
+                    if pos not in target_set and len(obstacles) < num_obstacles:
+                        obstacles.add(pos)
+
+            for r in range(1, self.grid_size - 1):
+                for c in range(2, self.grid_size - 2, 3):
+                    pos = (r, c)
+                    if pos not in target_set and pos not in obstacles and len(obstacles) < num_obstacles:
+                        obstacles.add(pos)
+
+        elif pattern == "Scattered":
+            # Create clusters of obstacles
+            num_clusters = min(5, num_obstacles // 5)
+            obstacles_per_cluster = num_obstacles // num_clusters
+
+            for _ in range(num_clusters):
+                # Choose a random center for the cluster
+                center_r = random.randint(2, self.grid_size - 3)
+                center_c = random.randint(2, self.grid_size - 3)
+
+                # Add obstacles around the center
+                for dr in range(-2, 3):
+                    for dc in range(-2, 3):
+                        # Add with decreasing probability as distance increases
+                        distance = abs(dr) + abs(dc)
+                        if random.random() < (1.0 - distance * 0.2):
+                            r = center_r + dr
+                            c = center_c + dc
+                            pos = (r, c)
+                            if (0 <= r < self.grid_size and 0 <= c < self.grid_size and
+                                pos not in target_set and pos not in obstacles and
+                                len(obstacles) < num_obstacles):
+                                obstacles.add(pos)
+
+        elif pattern == "Wall with Gap":
+            # Create a wall with a gap
+            center_r = self.grid_size // 2
+
+            # Create a horizontal wall with one gap
+            gap_position = random.randint(self.grid_size // 4, 3 * self.grid_size // 4)
+
+            for c in range(self.grid_size):
+                if c != gap_position:
+                    pos = (center_r, c)
+                    if pos not in target_set and len(obstacles) < num_obstacles:
+                        obstacles.add(pos)
+
+        # If we don't have enough obstacles, add random ones to fill up
+        if len(obstacles) < num_obstacles:
+            remaining = num_obstacles - len(obstacles)
+            random_obstacles = self._create_default_random_obstacles(remaining, target_shape.copy() + list(obstacles))
+            obstacles.update(random_obstacles)
+
+        # If we have too many obstacles, remove some randomly
+        if len(obstacles) > num_obstacles:
+            obstacles = set(random.sample(list(obstacles), num_obstacles))
+
+        return obstacles
+
+    def _create_default_random_obstacles(self, num_obstacles, target_shape):
+        """
+        Create default random scattered obstacles.
+
+        Args:
+            num_obstacles (int): Number of obstacles to create
+            target_shape (list): List of (row, col) positions to avoid
+
+        Returns:
+            set: Set of (row, col) positions with obstacles
+        """
+        target_set = set(target_shape)
+        obstacles = set()
+
+        # Create random obstacles
+        while len(obstacles) < num_obstacles:
+            row = random.randint(0, self.grid_size - 1)
+            col = random.randint(0, self.grid_size - 1)
+            pos = (row, col)
+
+            # Make sure obstacle doesn't overlap with target shape
+            if pos not in target_set and pos not in obstacles:
+                obstacles.add(pos)
+
+        return obstacles
+
+# Helper functions moved to class methods in EvolutionaryTrainer
 
 # Example usage
 if __name__ == "__main__":
@@ -816,18 +1149,19 @@ if __name__ == "__main__":
         for c in range(center_col - 1, center_col + 4):
             target_shape.append((r, c))
 
-    # Create random obstacles
-    obstacles = create_random_obstacles(grid_size, 10, target_shape)
-
-    # Create and run trainer
+    # Create and run trainer (obstacles will be created automatically)
     trainer = EvolutionaryTrainer(
         grid_size=grid_size,
         target_shape=target_shape,
-        obstacles=obstacles,
         population_size=50,
         genome_size=8,
         max_generations=50
     )
+
+    # Create obstacles using the class method
+    obstacles = trainer._create_random_obstacles(10, target_shape)
+    trainer.obstacles = obstacles
+    trainer.fitness_evaluator.obstacles = obstacles
 
     best_individual = trainer.train(visualize_best=True)
 

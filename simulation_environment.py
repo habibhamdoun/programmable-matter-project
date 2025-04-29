@@ -93,6 +93,74 @@ class SimulationEnvironment:
         # Assign targets to cells
         self._assign_targets()
 
+    def initialize_cells_with_positions(self, strategy=None, start_positions=None):
+        """
+        Initialize cells with specified starting positions and assign targets.
+
+        Args:
+            strategy (dict): Movement strategy parameters
+            start_positions (list): List of (row, col) positions for each cell
+        """
+        if not start_positions:
+            # Fall back to random positions if no positions provided
+            return self.initialize_cells(strategy)
+
+        # If we have fewer starting positions than cells, we'll use what we have
+        # and randomly place the rest
+        use_random_for_remaining = len(start_positions) < self.num_cells
+        print(f"Using {len(start_positions)} custom positions for {self.num_cells} cells")
+
+        # Initialize dictionaries
+        self.cell_controllers = {}
+        self.cell_positions = {}
+        self.cell_targets = {}
+
+        # Create cell controllers
+        for i in range(self.num_cells):
+            self.cell_controllers[i] = CellController(i, self.grid_size, strategy)
+
+        # Get available positions for random placement if needed
+        available_positions = []
+        for r in range(self.grid_size):
+            for c in range(self.grid_size):
+                test_pos = (r, c)
+                if test_pos not in self.obstacles:
+                    available_positions.append(test_pos)
+
+        # Shuffle available positions for random placement
+        random.shuffle(available_positions)
+
+        # Place cells at specified positions
+        for i in range(self.num_cells):
+            if i < len(start_positions):
+                # Use custom position
+                pos = start_positions[i]
+
+                # Ensure position is valid (within grid and not an obstacle)
+                if (0 <= pos[0] < self.grid_size and
+                    0 <= pos[1] < self.grid_size and
+                    pos not in self.obstacles):
+                    self.cell_positions[i] = pos
+                    self.cell_controllers[i].set_position(pos)
+                    # Remove this position from available positions
+                    if pos in available_positions:
+                        available_positions.remove(pos)
+                else:
+                    # If position is invalid, use a random position
+                    if available_positions:
+                        random_pos = available_positions.pop(0)
+                        self.cell_positions[i] = random_pos
+                        self.cell_controllers[i].set_position(random_pos)
+            else:
+                # Use random position for remaining cells
+                if available_positions:
+                    random_pos = available_positions.pop(0)
+                    self.cell_positions[i] = random_pos
+                    self.cell_controllers[i].set_position(random_pos)
+
+        # Assign targets to cells
+        self._assign_targets()
+
     def _assign_targets(self):
         """Assign target positions to cells using a modified approach that prioritizes center positions"""
         # Get list of cells and targets

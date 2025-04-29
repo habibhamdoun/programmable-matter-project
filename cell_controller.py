@@ -32,6 +32,7 @@ class CellController:
         self.obstacle_memory = set()
         self.other_cells_memory = {}  # {cell_id: last_known_position}
         self.target_memory = set()  # Memory of target shape positions
+        self.visited_positions = {}  # Dictionary to track visited positions and how many times
 
         # Cooperation state
         self.is_yielding = False  # Whether this cell is currently yielding to another
@@ -58,6 +59,12 @@ class CellController:
         """Set the current position of the cell"""
         self.position = position
         self.last_positions.append(position)
+
+        # Track visited positions
+        if position in self.visited_positions:
+            self.visited_positions[position] += 1
+        else:
+            self.visited_positions[position] = 1
 
     def set_target(self, target):
         """Set the target position for this cell"""
@@ -167,8 +174,13 @@ class CellController:
         # Check if we've been oscillating between the same positions
         positions_set = set(self.last_positions)
 
+        # Check for oscillation patterns
+        is_oscillating = self._detect_oscillation()
+
         # More aggressive stuck detection - if we're revisiting the same few positions
-        if len(positions_set) <= 2:
+        if is_oscillating:
+            self.stuck_count += 3  # Increase stuck count even faster for oscillation
+        elif len(positions_set) <= 2:
             self.stuck_count += 2  # Increase stuck count faster
         elif len(positions_set) <= 3:
             self.stuck_count += 1
@@ -189,6 +201,32 @@ class CellController:
             else:
                 # No position or target, just reduce stuck count
                 self.stuck_count = max(0, self.stuck_count - 1)
+
+        # ENHANCED: Check if we're in a deadlock situation (surrounded by obstacles or other cells)
+        if self.stuck_count > 10:
+            self._check_for_deadlock()
+
+    def _detect_oscillation(self):
+        """
+        Detect if the cell is oscillating between positions.
+        Returns True if oscillation is detected, False otherwise.
+        """
+        if len(self.last_positions) < 4:
+            return False
+
+        # Check for A-B-A-B pattern (oscillating between two positions)
+        positions = list(self.last_positions)
+        if positions[-1] == positions[-3] and positions[-2] == positions[-4]:
+            return True
+
+        # Check for A-B-C-A-B-C pattern (oscillating between three positions)
+        if len(positions) >= 6:
+            if (positions[-1] == positions[-4] and
+                positions[-2] == positions[-5] and
+                positions[-3] == positions[-6]):
+                return True
+
+        return False
 
     def _find_best_move(self, occupied_positions):
         """
@@ -211,6 +249,10 @@ class CellController:
         center_boost = 0
         random_move_chance = 0
 
+        # Find the least visited positions among possible moves
+        visit_counts = [(move, self.visited_positions.get(move, 0)) for move in possible_moves]
+        least_visited = sorted(visit_counts, key=lambda x: x[1])
+
         if self.stuck_count > patience:
             # Gradually increase exploration as we get more stuck
             exploration_boost = min(0.7, self.stuck_count * 0.05)
@@ -224,6 +266,20 @@ class CellController:
             # If we're extremely stuck, try a completely random valid move
             if self.stuck_count > patience * 3 and random.random() < random_move_chance:
                 return random.choice(possible_moves)
+
+            # If we're very stuck, prioritize the least visited position
+            if self.stuck_count > patience * 2 and random.random() < 0.7:
+                # Choose one of the least visited positions with some randomness
+                # to avoid all cells choosing the same path
+                least_visited_candidates = [move for move, count in least_visited[:max(1, len(least_visited)//2)]]
+                return random.choice(least_visited_candidates)
+
+            # If we detect oscillation, make a more drastic change
+            if self._detect_oscillation() and random.random() < 0.8:
+                # Choose a position we haven't visited much
+                least_visited_candidates = [move for move, count in least_visited[:max(1, len(least_visited)//3)]]
+                if least_visited_candidates:
+                    return random.choice(least_visited_candidates)
 
         # Score each move
         scored_moves = []
@@ -305,6 +361,19 @@ class CellController:
         center_distance = self._manhattan_distance(move, (center_row, center_col))
         center_score = 1.0 / (center_distance + 1)  # Higher for positions closer to center
 
+        # ENHANCED: Check if we're in a narrow passage (surrounded by obstacles)
+        # If so, prioritize moving toward the center even more
+        obstacle_count = 0
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            check_pos = (move[0] + dr, move[1] + dc)
+            if check_pos in self.obstacle_memory:
+                obstacle_count += 1
+
+        # If surrounded by 2 or more obstacles, we might be in a narrow passage
+        narrow_passage_factor = 0
+        if obstacle_count >= 2:
+            narrow_passage_factor = 0.5 + (obstacle_count * 0.1)  # Increase with more obstacles
+
         # Get strategy parameters with defaults
         target_weight = self.strategy.get('target_weight', 1.0)
         obstacle_weight = self.strategy.get('obstacle_weight', 1.0)
@@ -336,7 +405,7 @@ class CellController:
             obstacle_weight * obstacle_proximity -
             cooperation * other_cells_proximity +
             efficiency_weight * efficiency_score +
-            (0.5 + center_boost) * center_score  # Add center prioritization with boost
+            (0.5 + center_boost + narrow_passage_factor) * center_score  # Add center prioritization with boost and narrow passage factor
         )
 
         # ENHANCED: Add stronger exploration for stuck cells
@@ -353,6 +422,21 @@ class CellController:
         # Adjust score for diagonal moves
         if move[0] != self.position[0] and move[1] != self.position[1]:  # Diagonal move
             score *= diagonal_preference
+
+        # Penalize frequently visited positions
+        visit_penalty = 0
+        if move in self.visited_positions:
+            # Calculate penalty based on how many times we've visited this position
+            visit_count = self.visited_positions[move]
+            # Exponential penalty that increases with more visits
+            visit_penalty = min(1.5, 0.2 * (visit_count ** 1.5))
+
+            # If we're stuck, increase the penalty even more
+            if self.stuck_count > 5:
+                visit_penalty *= (1 + min(2.0, self.stuck_count * 0.1))
+
+        # Apply the visit penalty
+        score -= visit_penalty
 
         # Add a small random factor to break ties and prevent deterministic deadlocks
         score += random.uniform(0, 0.05)
@@ -461,6 +545,54 @@ class CellController:
             # Set new temporary target
             self.target = alternative_target
             self.path.clear()  # Clear existing path
+
+    def _check_for_deadlock(self):
+        """
+        Check if the cell is in a deadlock situation and try to resolve it.
+        A deadlock occurs when a cell is surrounded by obstacles or other cells
+        and can't make progress toward its target.
+        """
+        if not self.position or not self.target:
+            return
+
+        # Calculate the center of the grid
+        center_row, center_col = self.grid_size // 2, self.grid_size // 2
+        center = (center_row, center_col)
+
+        # If we're very stuck and far from the center, temporarily change our target to the center
+        if self.stuck_count > 15 and self._manhattan_distance(self.position, center) > 3:
+            # Save original target if not already yielding
+            if not self.is_yielding:
+                self.original_target = self.target
+
+            # Set temporary target to center of grid
+            self.is_yielding = True
+            self.yielding_for = -1  # Special value to indicate yielding for deadlock resolution
+            self.yield_countdown = 10  # Give more time to reach center
+            self.target = center
+            self.path.clear()
+
+        # If we're extremely stuck, try a more drastic approach
+        elif self.stuck_count > 25:
+            # Calculate the center of the target shape
+            if self.target_memory:
+                target_center_row = sum(pos[0] for pos in self.target_memory) / len(self.target_memory)
+                target_center_col = sum(pos[1] for pos in self.target_memory) / len(self.target_memory)
+                target_center = (int(target_center_row), int(target_center_col))
+
+                # Find a path to the target center that avoids the current deadlock area
+                # For simplicity, we'll just set the target to the target center
+                if not self.is_yielding:
+                    self.original_target = self.target
+
+                self.is_yielding = True
+                self.yielding_for = -2  # Special value for extreme deadlock resolution
+                self.yield_countdown = 15  # Give even more time
+                self.target = target_center
+                self.path.clear()
+
+                # Reset stuck count to give this approach a chance
+                self.stuck_count = 5
 
     def _find_yield_position(self, other_cell_pos):
         """
