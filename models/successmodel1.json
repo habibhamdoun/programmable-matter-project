@@ -1,0 +1,26 @@
+{
+  "genome": [
+    0.9459352428960335,
+    0.2065206474745902,
+    1.0,
+    -0.14110632891080344,
+    1.0,
+    -0.9120244658363091,
+    0.30507153363853146,
+    -0.04090260439896959
+  ],
+  "fitness": 0.5945396741390228,
+  "steps_taken": 18,
+  "time_taken": 0.01206517219543457,
+  "shape_accuracy": 0.0,
+  "strategy": {
+    "target_weight": 1.959451432172025,
+    "obstacle_weight": 1.4048904856059425,
+    "efficiency_weight": 2.0,
+    "exploration_threshold": 0.2717787342178393,
+    "diagonal_preference": 1.5,
+    "patience": 3,
+    "cooperation": 0.6525357668192657,
+    "risk_tolerance": 0.47954869780051523
+  }
+}

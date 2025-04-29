@@ -102,6 +102,11 @@ class SimulationEnvironment:
         # Calculate grid center
         center_row, center_col = self.grid_size // 2, self.grid_size // 2
 
+        # Update target memory for all cells
+        for cell_id in self.cell_controllers:
+            for target_pos in self.target_shape:
+                self.cell_controllers[cell_id].target_memory.add(target_pos)
+
         # Sort targets by distance from center (inner targets first)
         sorted_targets = sorted(targets,
                                key=lambda pos: abs(pos[0] - center_row) + abs(pos[1] - center_col))
@@ -234,6 +239,9 @@ class SimulationEnvironment:
         # Check for target swapping opportunities
         self._check_for_target_swaps()
 
+        # ENHANCED: Rescue cells that are severely stuck
+        self._rescue_stuck_cells()
+
         # Collect moves from all cells
         moves = {}
         for cell_id, controller in self.cell_controllers.items():
@@ -249,6 +257,76 @@ class SimulationEnvironment:
             self.cell_positions[cell_id] = next_pos
             self.cell_controllers[cell_id].set_position(next_pos)
 
+    def _rescue_stuck_cells(self):
+        """
+        Rescue cells that have been stuck outside the formation for too long.
+        This is a last resort mechanism for cells that can't be helped by target swapping.
+        """
+        # Find cells that are severely stuck
+        for cell_id, controller in self.cell_controllers.items():
+            # If a cell has been stuck for a very long time, it needs rescue
+            if controller.stuck_count > 30:  # Extremely stuck
+                # Get current position and target
+                current_pos = self.cell_positions[cell_id]
+                target_pos = self.cell_targets[cell_id]
+
+                # Check if the cell is far from its target
+                distance = abs(current_pos[0] - target_pos[0]) + abs(current_pos[1] - target_pos[1])
+
+                if distance > 5:  # Cell is far from target and stuck
+                    # Find a better target for this cell
+                    new_target = self._find_rescue_target(cell_id)
+
+                    if new_target:
+                        # Update the cell's target
+                        self.cell_targets[cell_id] = new_target
+                        controller.set_target(new_target)
+
+                        # Reset stuck count
+                        controller.stuck_count = 0
+
+    def _find_rescue_target(self, cell_id):
+        """
+        Find a rescue target for a stuck cell.
+
+        Args:
+            cell_id (int): ID of the cell to rescue
+
+        Returns:
+            tuple: New target position or None if no suitable target found
+        """
+        # Get the cell's current position
+        current_pos = self.cell_positions[cell_id]
+
+        # Get all target positions
+        all_targets = set(self.cell_targets.values())
+
+        # Get all occupied targets
+        occupied_targets = set()
+        for other_id, other_pos in self.cell_positions.items():
+            if other_pos in all_targets:
+                occupied_targets.add(other_pos)
+
+        # Find unoccupied targets
+        unoccupied_targets = all_targets - occupied_targets
+
+        if not unoccupied_targets:
+            # All targets are occupied, try to find the closest target
+            # that's not the cell's current target
+            current_target = self.cell_targets[cell_id]
+            candidates = [t for t in all_targets if t != current_target]
+
+            if candidates:
+                # Return the closest candidate
+                return min(candidates, key=lambda t: abs(current_pos[0] - t[0]) + abs(current_pos[1] - t[1]))
+            return None
+
+        # Find the closest unoccupied target
+        closest_target = min(unoccupied_targets,
+                            key=lambda t: abs(current_pos[0] - t[0]) + abs(current_pos[1] - t[1]))
+
+        return closest_target
+
     def _check_for_target_swaps(self):
         """
         Check if any cells would benefit from swapping targets.
@@ -256,48 +334,95 @@ class SimulationEnvironment:
         """
         # Build a list of cells that are stuck
         stuck_cells = []
+        moderately_stuck_cells = []
+        normal_cells = []
+
         for cell_id, controller in self.cell_controllers.items():
             # Use a default value if 'patience' is not in the strategy
             patience = controller.strategy.get('patience', 5)
-            if controller.stuck_count > patience:
+
+            # Categorize cells by how stuck they are
+            if controller.stuck_count > patience * 2:  # Severely stuck
                 stuck_cells.append(cell_id)
+            elif controller.stuck_count > patience // 2:  # Moderately stuck
+                moderately_stuck_cells.append(cell_id)
+            else:
+                normal_cells.append(cell_id)
 
-        # If we have stuck cells, look for potential target swaps
-        if len(stuck_cells) >= 2:
-            for i in range(len(stuck_cells)):
-                for j in range(i + 1, len(stuck_cells)):
-                    cell_id1 = stuck_cells[i]
-                    cell_id2 = stuck_cells[j]
+        # ENHANCED: First try swapping stuck cells with each other
+        self._try_swap_cells(stuck_cells, stuck_cells, threshold=0.9)
 
-                    # Get current positions and targets
-                    pos1 = self.cell_positions[cell_id1]
-                    pos2 = self.cell_positions[cell_id2]
-                    target1 = self.cell_targets[cell_id1]
-                    target2 = self.cell_targets[cell_id2]
+        # ENHANCED: Then try swapping stuck cells with moderately stuck cells
+        if stuck_cells:
+            self._try_swap_cells(stuck_cells, moderately_stuck_cells, threshold=0.95)
 
-                    # Calculate current distances
-                    current_dist1 = abs(pos1[0] - target1[0]) + abs(pos1[1] - target1[1])
-                    current_dist2 = abs(pos2[0] - target2[0]) + abs(pos2[1] - target2[1])
-                    current_total = current_dist1 + current_dist2
+        # ENHANCED: Finally, try swapping stuck cells with normal cells
+        # This is more aggressive - even if it makes things slightly worse for normal cells,
+        # it might help get stuck cells out of deadlock
+        if stuck_cells:
+            self._try_swap_cells(stuck_cells, normal_cells, threshold=1.1)
 
-                    # Calculate distances if targets were swapped
-                    swap_dist1 = abs(pos1[0] - target2[0]) + abs(pos1[1] - target2[1])
-                    swap_dist2 = abs(pos2[0] - target1[0]) + abs(pos2[1] - target1[1])
-                    swap_total = swap_dist1 + swap_dist2
+        # ENHANCED: If we still have moderately stuck cells, try swapping them
+        if moderately_stuck_cells:
+            self._try_swap_cells(moderately_stuck_cells, moderately_stuck_cells, threshold=1.0)
 
-                    # If swapping would reduce total distance, do it
-                    if swap_total < current_total:
-                        # Swap targets
-                        self.cell_targets[cell_id1] = target2
-                        self.cell_targets[cell_id2] = target1
+    def _try_swap_cells(self, cell_list1, cell_list2, threshold=1.0):
+        """
+        Try to swap targets between two lists of cells.
 
-                        # Update cell controllers
-                        self.cell_controllers[cell_id1].set_target(target2)
-                        self.cell_controllers[cell_id2].set_target(target1)
+        Args:
+            cell_list1 (list): First list of cell IDs
+            cell_list2 (list): Second list of cell IDs
+            threshold (float): Threshold for swapping (lower means more aggressive swapping)
+                               Values > 1.0 mean we'll swap even if it makes things slightly worse
 
-                        # Reset stuck count
-                        self.cell_controllers[cell_id1].stuck_count = 0
-                        self.cell_controllers[cell_id2].stuck_count = 0
+        Returns:
+            bool: True if a swap was made, False otherwise
+        """
+        if not cell_list1 or not cell_list2:
+            return False
+
+        # Try all possible pairs of cells
+        for cell_id1 in cell_list1:
+            for cell_id2 in cell_list2:
+                if cell_id1 == cell_id2:
+                    continue
+
+                # Get current positions and targets
+                pos1 = self.cell_positions[cell_id1]
+                pos2 = self.cell_positions[cell_id2]
+                target1 = self.cell_targets[cell_id1]
+                target2 = self.cell_targets[cell_id2]
+
+                # Calculate current distances
+                current_dist1 = abs(pos1[0] - target1[0]) + abs(pos1[1] - target1[1])
+                current_dist2 = abs(pos2[0] - target2[0]) + abs(pos2[1] - target2[1])
+                current_total = current_dist1 + current_dist2
+
+                # Calculate distances if targets were swapped
+                swap_dist1 = abs(pos1[0] - target2[0]) + abs(pos1[1] - target2[1])
+                swap_dist2 = abs(pos2[0] - target1[0]) + abs(pos2[1] - target1[1])
+                swap_total = swap_dist1 + swap_dist2
+
+                # If swapping would reduce total distance or is within threshold
+                if swap_total < current_total * threshold:
+                    # Swap targets
+                    self.cell_targets[cell_id1] = target2
+                    self.cell_targets[cell_id2] = target1
+
+                    # Update cell controllers
+                    self.cell_controllers[cell_id1].set_target(target2)
+                    self.cell_controllers[cell_id2].set_target(target1)
+
+                    # Reset stuck count
+                    self.cell_controllers[cell_id1].stuck_count = 0
+                    self.cell_controllers[cell_id2].stuck_count = 0
+
+                    # Swap was successful
+                    return True
+
+        # No swap was made
+        return False
 
     def _resolve_conflicts(self, moves):
         """

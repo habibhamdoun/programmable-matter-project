@@ -31,6 +31,7 @@ class CellController:
         # Memory of environment
         self.obstacle_memory = set()
         self.other_cells_memory = {}  # {cell_id: last_known_position}
+        self.target_memory = set()  # Memory of target shape positions
 
         # Cooperation state
         self.is_yielding = False  # Whether this cell is currently yielding to another
@@ -62,6 +63,10 @@ class CellController:
         """Set the target position for this cell"""
         self.target = target
         self.path.clear()  # Clear any existing path
+
+        # Add target to target memory
+        if target:
+            self.target_memory.add(target)
 
     def update_environment(self, obstacles, other_cells):
         """
@@ -161,10 +166,29 @@ class CellController:
 
         # Check if we've been oscillating between the same positions
         positions_set = set(self.last_positions)
+
+        # More aggressive stuck detection - if we're revisiting the same few positions
         if len(positions_set) <= 2:
+            self.stuck_count += 2  # Increase stuck count faster
+        elif len(positions_set) <= 3:
             self.stuck_count += 1
         else:
-            self.stuck_count = max(0, self.stuck_count - 1)
+            # Only reduce stuck count if we're making real progress toward target
+            if self.position and self.target:
+                # Get the first and last position in our history
+                first_pos = self.last_positions[0]
+                last_pos = self.last_positions[-1]
+
+                # Check if we're getting closer to the target
+                first_dist = self._manhattan_distance(first_pos, self.target)
+                last_dist = self._manhattan_distance(last_pos, self.target)
+
+                if last_dist < first_dist:
+                    # We're making progress, reduce stuck count
+                    self.stuck_count = max(0, self.stuck_count - 1)
+            else:
+                # No position or target, just reduce stuck count
+                self.stuck_count = max(0, self.stuck_count - 1)
 
     def _find_best_move(self, occupied_positions):
         """
@@ -181,15 +205,30 @@ class CellController:
         if not possible_moves:
             return None
 
-        # If we're stuck for too long, increase exploration
+        # If we're stuck for too long, try more aggressive strategies
+        patience = self.strategy.get('patience', 5)
         exploration_boost = 0
-        if self.stuck_count > self.strategy['patience']:
-            exploration_boost = min(0.5, self.stuck_count * 0.05)
+        center_boost = 0
+        random_move_chance = 0
+
+        if self.stuck_count > patience:
+            # Gradually increase exploration as we get more stuck
+            exploration_boost = min(0.7, self.stuck_count * 0.05)
+
+            # Increase center bias to help escape deadlocks
+            center_boost = min(1.0, self.stuck_count * 0.1)
+
+            # Chance to make a completely random move to break out of deadlocks
+            random_move_chance = min(0.3, (self.stuck_count - patience) * 0.02)
+
+            # If we're extremely stuck, try a completely random valid move
+            if self.stuck_count > patience * 3 and random.random() < random_move_chance:
+                return random.choice(possible_moves)
 
         # Score each move
         scored_moves = []
         for move in possible_moves:
-            score = self._score_move(move, occupied_positions, exploration_boost)
+            score = self._score_move(move, occupied_positions, exploration_boost, center_boost)
             scored_moves.append((move, score))
 
         # Return the move with the highest score
@@ -198,6 +237,9 @@ class CellController:
         # Update path if we found a good move
         if self._manhattan_distance(best_move, self.target) < self._manhattan_distance(self.position, self.target):
             self.total_moves += 1
+            # Reset stuck count if we're making progress
+            if self.stuck_count > 0:
+                self.stuck_count -= 1
 
         return best_move
 
@@ -230,7 +272,7 @@ class CellController:
 
         return possible_moves
 
-    def _score_move(self, move, occupied_positions, exploration_boost=0):
+    def _score_move(self, move, occupied_positions, exploration_boost=0, center_boost=0):
         """
         Score a potential move based on the cell's strategy.
 
@@ -238,6 +280,7 @@ class CellController:
             move (tuple): Potential move position (row, col)
             occupied_positions (set): Set of positions occupied by any cell
             exploration_boost (float): Additional exploration factor
+            center_boost (float): Additional center prioritization factor
 
         Returns:
             float: Score for this move (higher is better)
@@ -262,23 +305,57 @@ class CellController:
         center_distance = self._manhattan_distance(move, (center_row, center_col))
         center_score = 1.0 / (center_distance + 1)  # Higher for positions closer to center
 
+        # Get strategy parameters with defaults
+        target_weight = self.strategy.get('target_weight', 1.0)
+        obstacle_weight = self.strategy.get('obstacle_weight', 1.0)
+        cooperation = self.strategy.get('cooperation', 0.5)
+        efficiency_weight = self.strategy.get('efficiency_weight', 1.0)
+        exploration_threshold = self.strategy.get('exploration_threshold', 0.2)
+        diagonal_preference = self.strategy.get('diagonal_preference', 1.0)
+
+        # ENHANCED: Calculate distance to center of target shape
+        # This helps cells navigate toward the general area of the target shape
+        target_center_row = sum(pos[0] for pos in self.target_memory) / len(self.target_memory) if self.target_memory else center_row
+        target_center_col = sum(pos[1] for pos in self.target_memory) / len(self.target_memory) if self.target_memory else center_col
+        target_center = (int(target_center_row), int(target_center_col))
+
+        # Distance to target center (lower is better)
+        distance_to_target_center = self._manhattan_distance(move, target_center)
+        target_center_score = 1.0 / (distance_to_target_center + 1)
+
+        # ENHANCED: If we're stuck, prioritize moving toward the center of the target shape
+        # rather than directly to our assigned target
+        if self.stuck_count > 5:
+            # Gradually shift priority from individual target to target center as stuck count increases
+            stuck_factor = min(0.8, self.stuck_count * 0.05)
+            target_score = (1 - stuck_factor) * target_score + stuck_factor * target_center_score
+
         # Calculate final score
         score = (
-            self.strategy['target_weight'] * target_score -
-            self.strategy['obstacle_weight'] * obstacle_proximity -
-            self.strategy['cooperation'] * other_cells_proximity +
-            self.strategy['efficiency_weight'] * efficiency_score +
-            0.5 * center_score  # Add center prioritization with moderate weight
+            target_weight * target_score -
+            obstacle_weight * obstacle_proximity -
+            cooperation * other_cells_proximity +
+            efficiency_weight * efficiency_score +
+            (0.5 + center_boost) * center_score  # Add center prioritization with boost
         )
 
-        # Add exploration factor
-        exploration_factor = self.strategy['exploration_threshold'] + exploration_boost
+        # ENHANCED: Add stronger exploration for stuck cells
+        exploration_factor = exploration_threshold + exploration_boost
+        if self.stuck_count > 10:
+            # Dramatically increase exploration for very stuck cells
+            exploration_factor = min(0.9, exploration_factor + self.stuck_count * 0.02)
+
         if random.random() < exploration_factor:
-            score += random.uniform(0, 0.3)
+            # Increase the random factor based on stuck count
+            random_boost = 0.5 + min(1.0, self.stuck_count * 0.05)
+            score += random.uniform(0, random_boost)
 
         # Adjust score for diagonal moves
         if move[0] != self.position[0] and move[1] != self.position[1]:  # Diagonal move
-            score *= self.strategy['diagonal_preference']
+            score *= diagonal_preference
+
+        # Add a small random factor to break ties and prevent deterministic deadlocks
+        score += random.uniform(0, 0.05)
 
         return score
 

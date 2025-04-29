@@ -347,6 +347,29 @@ class EvolutionaryApp:
                 self.simulation_env = env
                 self._draw_grid()
 
+            # Update the trainer's visualization if it's the best individual of the current generation
+            if hasattr(self.trainer, 'best_individual') and self.trainer.best_individual and self.trainer.best_individual.get_movement_strategy() == strategy:
+                # This is the best individual of the current generation, update visualization
+                if hasattr(self.trainer, 'viz_canvas') and hasattr(self.trainer, 'viz_info_var'):
+                    # Convert final_positions to cell_positions format for visualization
+                    cell_positions = {}
+                    # Make sure final_positions is a set of position tuples
+                    if isinstance(final_positions, set):
+                        # Convert set of positions to dictionary mapping cell_id to position
+                        for i, pos in enumerate(final_positions):
+                            if isinstance(pos, tuple) and len(pos) == 2:
+                                cell_positions[i] = pos
+                            else:
+                                # Skip invalid positions
+                                continue
+
+                    # Update visualization
+                    self.trainer._draw_grid(cell_positions)
+                    self.trainer.viz_info_var.set(f"Best individual: {len(final_positions)} cells, {steps_taken} steps")
+
+                    # Update UI
+                    self.root.update()
+
             return final_positions, steps_taken
 
         # Setup progress callback
