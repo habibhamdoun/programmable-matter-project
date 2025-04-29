@@ -93,6 +93,12 @@ class EvolutionaryApp:
         self.mutation_rate_var = tk.DoubleVar(value=self.mutation_rate)
         ttk.Spinbox(train_frame, from_=0.01, to=0.5, increment=0.01, textvariable=self.mutation_rate_var, width=5).grid(row=2, column=1, sticky=tk.W, pady=2)
 
+        # Movement constraints
+        ttk.Label(train_frame, text="Movement Constraints:").grid(row=3, column=0, sticky=tk.W, pady=2)
+        self.main_keep_connected_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(train_frame, text="Keep cells connected",
+                       variable=self.main_keep_connected_var).grid(row=3, column=1, sticky=tk.W, pady=2)
+
         # Action buttons
         button_frame = ttk.Frame(left_panel)
         button_frame.pack(fill=tk.X, pady=10)
@@ -266,6 +272,14 @@ class EvolutionaryApp:
         self.use_custom_start_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(start_pos_frame, text="Use custom starting positions",
                        variable=self.use_custom_start_var).pack(anchor=tk.W)
+
+        # Movement constraints option
+        movement_frame = ttk.Frame(training_options_frame)
+        movement_frame.pack(fill=tk.X, pady=(0, 5))
+
+        self.keep_connected_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(movement_frame, text="Keep cells connected (snake-like movement)",
+                       variable=self.keep_connected_var).pack(anchor=tk.W)
 
         # Training parameters
         params_frame = ttk.LabelFrame(training_options_frame, text="Training Parameters", padding=5)
@@ -548,6 +562,11 @@ class EvolutionaryApp:
             num_cells=self.num_cells
         )
 
+        # Set connectivity constraint if enabled
+        if hasattr(self, 'main_keep_connected_var'):
+            self.simulation_env.keep_cells_connected = self.main_keep_connected_var.get()
+            print(f"Main tab - Keep cells connected: {self.simulation_env.keep_cells_connected}")
+
         # Initialize cells with default strategy
         self.simulation_env.initialize_cells()
 
@@ -770,6 +789,18 @@ class EvolutionaryApp:
                 num_cells=len(target_shape) # Use the length of the target shape
             )
 
+            # Set connectivity constraint if enabled - check both tabs
+            if hasattr(self, 'main_keep_connected_var'):
+                # Use the main tab's checkbox
+                env.keep_cells_connected = self.main_keep_connected_var.get()
+                if visualize:
+                    print(f"Training - Using main tab connectivity: {env.keep_cells_connected}")
+            elif hasattr(self, 'keep_connected_var'):
+                # Fall back to custom tab's checkbox
+                env.keep_cells_connected = self.keep_connected_var.get()
+                if visualize:
+                    print(f"Training - Using custom tab connectivity: {env.keep_cells_connected}")
+
             # Initialize cells with the strategy and custom starting positions if enabled
             if hasattr(self, 'use_custom_start_var') and self.use_custom_start_var.get():
                 if hasattr(self, 'custom_start_positions') and self.custom_start_positions:
@@ -824,11 +855,17 @@ class EvolutionaryApp:
         import threading
 
         def training_thread():
-            # Train the population
-            self.best_individual = self.trainer.train(simulation_func)
+            try:
+                # Train the population
+                self.best_individual = self.trainer.train(simulation_func)
 
-            # Update UI when done
-            self.root.after(0, training_complete)
+                # Update UI when done
+                self.root.after(0, training_complete)
+            except Exception as e:
+                # Handle any errors during training
+                print(f"Training error: {e}")
+                # Update UI to show error
+                self.root.after(0, lambda: training_error(str(e)))
 
         def training_complete():
             # Update status
@@ -873,6 +910,16 @@ class EvolutionaryApp:
             obstacles=self.obstacles,
             num_cells=self.num_cells
         )
+
+        # Set connectivity constraint if enabled - check both tabs
+        if hasattr(self, 'main_keep_connected_var'):
+            # Use the main tab's checkbox
+            self.simulation_env.keep_cells_connected = self.main_keep_connected_var.get()
+            print(f"Simulate best - Using main tab connectivity: {self.simulation_env.keep_cells_connected}")
+        elif hasattr(self, 'keep_connected_var'):
+            # Fall back to custom tab's checkbox
+            self.simulation_env.keep_cells_connected = self.keep_connected_var.get()
+            print(f"Simulate best - Using custom tab connectivity: {self.simulation_env.keep_cells_connected}")
 
         # Initialize cells with the best strategy
         self.simulation_env.initialize_cells(strategy)
@@ -1438,6 +1485,16 @@ class EvolutionaryApp:
             obstacles=self.custom_obstacles,
             num_cells=len(self.custom_target_shape)
         )
+
+        # Set connectivity constraint if enabled - check both tabs
+        if hasattr(self, 'main_keep_connected_var'):
+            # Use the main tab's checkbox
+            test_env.keep_cells_connected = self.main_keep_connected_var.get()
+            print(f"Test model - Using main tab connectivity: {test_env.keep_cells_connected}")
+        elif hasattr(self, 'keep_connected_var'):
+            # Fall back to custom tab's checkbox
+            test_env.keep_cells_connected = self.keep_connected_var.get()
+            print(f"Test model - Using custom tab connectivity: {test_env.keep_cells_connected}")
 
         # Check if we have custom starting positions
         use_custom_start = False

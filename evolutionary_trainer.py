@@ -515,11 +515,15 @@ class EvolutionaryTrainer:
                 self.best_individual = best_individual
 
                 # Visualize the best individual's movement for this generation
-                if self.show_viz_var.get():
-                    self.viz_info_var.set(f"Visualizing best individual from generation {generation + 1}")
-                    strategy = best_individual.get_movement_strategy()
-                    # Run a quick simulation to visualize the movement
-                    self._visualize_movement(strategy)
+                if hasattr(self, 'show_viz_var') and self.show_viz_var.get():
+                    try:
+                        self.viz_info_var.set(f"Visualizing best individual from generation {generation + 1}")
+                        strategy = best_individual.get_movement_strategy()
+                        # Run a quick simulation to visualize the movement
+                        self._visualize_movement(strategy)
+                    except Exception as e:
+                        print(f"Error visualizing movement: {e}")
+                        # Continue training even if visualization fails
 
             # Store history in the main app if available
             if self.app is not None:
@@ -944,66 +948,81 @@ class EvolutionaryTrainer:
         Args:
             strategy (dict): Movement strategy parameters
         """
-        # Create a simulation environment
-        from simulation_environment import SimulationEnvironment
+        try:
+            # Create a simulation environment
+            from simulation_environment import SimulationEnvironment
 
-        sim_env = SimulationEnvironment(
-            grid_size=self.grid_size,
-            target_shape=self.target_shape,
-            obstacles=self.obstacles,
-            num_cells=len(self.target_shape)
-        )
+            sim_env = SimulationEnvironment(
+                grid_size=self.grid_size,
+                target_shape=self.target_shape,
+                obstacles=self.obstacles,
+                num_cells=len(self.target_shape)
+            )
 
-        # Initialize cells with the strategy and custom starting positions if available
-        if self.start_positions and len(self.start_positions) > 0:
-            sim_env.initialize_cells_with_positions(strategy, self.start_positions)
-        else:
-            sim_env.initialize_cells(strategy)
+            # Set connectivity constraint if enabled
+            if hasattr(self, 'app') and self.app:
+                if hasattr(self.app, 'main_keep_connected_var'):
+                    sim_env.keep_cells_connected = self.app.main_keep_connected_var.get()
+                elif hasattr(self.app, 'keep_connected_var'):
+                    sim_env.keep_cells_connected = self.app.keep_connected_var.get()
 
-        # Get initial positions
-        initial_positions = sim_env.cell_positions.copy()
+            # Initialize cells with the strategy and custom starting positions if available
+            if hasattr(self, 'start_positions') and self.start_positions and len(self.start_positions) > 0:
+                sim_env.initialize_cells_with_positions(strategy, self.start_positions)
+            else:
+                sim_env.initialize_cells(strategy)
 
-        # Draw initial state
-        self._draw_grid(initial_positions)
-        self.viz_info_var.set(f"Initial positions")
-        self.ui_window.update()
-        time.sleep(0.5)  # Pause to show initial state
+            # Get initial positions
+            initial_positions = sim_env.cell_positions.copy()
 
-        # Run simulation step by step
-        max_steps = 50  # Limit to prevent infinite loops
-        step = 0
-        sim_env.simulation_complete = False
-
-        while step < max_steps and not sim_env.simulation_complete:
-            # Make one step
-            sim_env._step_simulation()
-            sim_env._check_completion()  # Check if simulation is complete
-            step += 1
-
-            # Draw current state
-            self._draw_grid(sim_env.cell_positions)
-
-            # Count active cells (cells not at their targets)
-            active_cells = 0
-            for cell_id, target in sim_env.cell_targets.items():
-                if sim_env.cell_positions[cell_id] != target:
-                    active_cells += 1
-
-            self.viz_info_var.set(f"Step {step}: {active_cells} active cells")
+            # Draw initial state
+            self._draw_grid(initial_positions)
+            self.viz_info_var.set(f"Initial positions")
             self.ui_window.update()
+            time.sleep(0.1)  # Shorter pause to show initial state
 
-            # Adjust speed based on slider
-            delay = 1.0 - self.viz_speed_var.get()  # Invert so higher value = faster
-            time.sleep(max(0.05, delay * 0.5))  # At least 0.05 seconds delay
+            # Run simulation step by step
+            max_steps = 20  # Reduced limit to speed up visualization
+            step = 0
+            sim_env.simulation_complete = False
 
-            # Stop if all cells have reached their targets
-            if sim_env.simulation_complete:
-                break
+            while step < max_steps and not sim_env.simulation_complete:
+                # Make one step
+                sim_env._step_simulation()
+                sim_env._check_completion()  # Check if simulation is complete
+                step += 1
 
-        # Show final state
-        self._draw_grid(sim_env.cell_positions)
-        self.viz_info_var.set(f"Movement complete in {step} steps")
-        self.ui_window.update()
+                # Draw current state
+                self._draw_grid(sim_env.cell_positions)
+
+                # Count active cells (cells not at their targets)
+                active_cells = 0
+                for cell_id, target in sim_env.cell_targets.items():
+                    if sim_env.cell_positions[cell_id] != target:
+                        active_cells += 1
+
+                self.viz_info_var.set(f"Step {step}: {active_cells} active cells")
+                self.ui_window.update()
+
+                # Adjust speed based on slider
+                delay = 1.0 - self.viz_speed_var.get()  # Invert so higher value = faster
+                time.sleep(max(0.01, delay * 0.2))  # Reduced delay for faster visualization
+
+                # Stop if all cells have reached their targets
+                if sim_env.simulation_complete:
+                    break
+
+            # Show final state
+            self._draw_grid(sim_env.cell_positions)
+            self.viz_info_var.set(f"Movement complete in {step} steps")
+            self.ui_window.update()
+        except Exception as e:
+            # If visualization fails, log the error but continue training
+            print(f"Visualization error: {e}")
+            if hasattr(self, 'viz_info_var'):
+                self.viz_info_var.set(f"Visualization error: {e}")
+                if hasattr(self, 'ui_window') and self.ui_window:
+                    self.ui_window.update()
 
     def _create_random_obstacles(self, num_obstacles, target_shape):
         """

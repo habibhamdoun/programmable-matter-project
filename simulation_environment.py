@@ -42,6 +42,9 @@ class SimulationEnvironment:
         self.start_time = None
         self.end_time = None
 
+        # Movement constraints
+        self.keep_cells_connected = False  # Snake-like movement constraint
+
         # UI elements
         self.ui_window = None
         self.canvas = None
@@ -61,6 +64,7 @@ class SimulationEnvironment:
     def initialize_cells(self, strategy=None):
         """
         Initialize cell controllers with random positions.
+        If keep_cells_connected is True, ensures cells start in a connected formation.
 
         Args:
             strategy (dict): Strategy parameters to use for all cells
@@ -74,28 +78,173 @@ class SimulationEnvironment:
             self.cell_controllers[i] = CellController(i, self.grid_size, strategy)
 
         # Place cells at random positions
-        available_positions = []
-        for r in range(self.grid_size):
-            for c in range(self.grid_size):
-                pos = (r, c)
-                if pos not in self.obstacles:
-                    available_positions.append(pos)
+        if self.keep_cells_connected:
+            # Place cells in a connected formation
+            self._place_cells_in_connected_formation()
+        else:
+            # Place cells randomly
+            available_positions = []
+            for r in range(self.grid_size):
+                for c in range(self.grid_size):
+                    pos = (r, c)
+                    if pos not in self.obstacles:
+                        available_positions.append(pos)
 
-        # Shuffle available positions
-        random.shuffle(available_positions)
+            # Shuffle available positions
+            random.shuffle(available_positions)
 
-        # Assign positions to cells
-        for i in range(self.num_cells):
-            if i < len(available_positions):
-                self.cell_positions[i] = available_positions[i]
-                self.cell_controllers[i].set_position(available_positions[i])
+            # Assign positions to cells
+            for i in range(self.num_cells):
+                if i < len(available_positions):
+                    self.cell_positions[i] = available_positions[i]
+                    self.cell_controllers[i].set_position(available_positions[i])
 
         # Assign targets to cells
         self._assign_targets()
 
+    def _place_cells_in_connected_formation(self):
+        """
+        Place cells in a connected formation (like a snake).
+        This ensures that all cells are adjacent to at least one other cell.
+        """
+        print("Placing cells in a connected formation (snake-like)")
+
+        # Find a random starting position away from obstacles and edges
+        center_row, center_col = self.grid_size // 2, self.grid_size // 2
+
+        # Try to start near the center, but not too close to the target shape
+        start_row = random.randint(max(1, center_row - 5), min(self.grid_size - 2, center_row + 5))
+        start_col = random.randint(max(1, center_col - 5), min(self.grid_size - 2, center_col + 5))
+
+        # Make sure starting position is not an obstacle
+        while (start_row, start_col) in self.obstacles:
+            start_row = random.randint(1, self.grid_size - 2)
+            start_col = random.randint(1, self.grid_size - 2)
+
+        # Place the first cell
+        self.cell_positions[0] = (start_row, start_col)
+        self.cell_controllers[0].set_position((start_row, start_col))
+
+        # Keep track of placed cells and their positions
+        placed_positions = {(start_row, start_col)}
+
+        # For snake-like formation, we'll create a line of cells
+        current_pos = (start_row, start_col)
+
+        # Define directions in priority order (try to go right, then down, then left, then up)
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+
+        # Place remaining cells in a snake-like pattern
+        for i in range(1, self.num_cells):
+            placed = False
+
+            # Try each direction in priority order
+            for dr, dc in directions:
+                new_pos = (current_pos[0] + dr, current_pos[1] + dc)
+
+                # Check if position is valid
+                if (0 <= new_pos[0] < self.grid_size and
+                    0 <= new_pos[1] < self.grid_size and
+                    new_pos not in self.obstacles and
+                    new_pos not in placed_positions):
+
+                    # Place cell at this position
+                    self.cell_positions[i] = new_pos
+                    self.cell_controllers[i].set_position(new_pos)
+                    placed_positions.add(new_pos)
+                    current_pos = new_pos  # Update current position for next cell
+                    placed = True
+                    break
+
+            # If we couldn't place the cell adjacent to the current position,
+            # try to find any valid position adjacent to any placed cell
+            if not placed:
+                possible_positions = set()
+                for pos in placed_positions:
+                    for dr, dc in directions:
+                        new_pos = (pos[0] + dr, pos[1] + dc)
+
+                        # Check if position is valid
+                        if (0 <= new_pos[0] < self.grid_size and
+                            0 <= new_pos[1] < self.grid_size and
+                            new_pos not in self.obstacles and
+                            new_pos not in placed_positions):
+                            possible_positions.add(new_pos)
+
+                if possible_positions:
+                    # Choose the position closest to the last placed cell
+                    next_pos = min(possible_positions,
+                                  key=lambda pos: abs(pos[0] - current_pos[0]) + abs(pos[1] - current_pos[1]))
+                    self.cell_positions[i] = next_pos
+                    self.cell_controllers[i].set_position(next_pos)
+                    placed_positions.add(next_pos)
+                    current_pos = next_pos
+                    placed = True
+
+            # If still not placed, we need to find any valid position
+            if not placed:
+                print("Warning: Could not find connected position for all cells")
+                # Fall back to random placement for remaining cells
+                available_positions = []
+                for r in range(self.grid_size):
+                    for c in range(self.grid_size):
+                        pos = (r, c)
+                        if pos not in self.obstacles and pos not in placed_positions:
+                            available_positions.append(pos)
+
+                if available_positions:
+                    random.shuffle(available_positions)
+                    for j in range(i, self.num_cells):
+                        if j - i < len(available_positions):
+                            pos = available_positions[j - i]
+                            self.cell_positions[j] = pos
+                            self.cell_controllers[j].set_position(pos)
+                            placed_positions.add(pos)
+                break
+
+        # Verify connectivity
+        graph = self._build_connectivity_graph(self.cell_positions)
+        is_connected = self._is_connected(graph)
+
+        print(f"Placed {len(self.cell_positions)} cells in a {'connected' if is_connected else 'DISCONNECTED'} formation")
+
+        # If not connected, try again with a simpler approach
+        if not is_connected and self.num_cells > 1:
+            print("WARNING: Failed to create connected formation, trying again with simpler approach")
+
+            # Clear existing positions
+            self.cell_positions.clear()
+
+            # Start with a line of cells from the center
+            center_row = self.grid_size // 2
+            center_col = self.grid_size // 2
+
+            # Place cells in a horizontal line
+            for i in range(self.num_cells):
+                pos = (center_row, center_col + i)
+
+                # If we hit the edge or an obstacle, wrap to the next row
+                if center_col + i >= self.grid_size or pos in self.obstacles:
+                    new_row = center_row + 1 + (i // self.grid_size)
+                    new_col = i % self.grid_size
+                    pos = (new_row, new_col)
+
+                # Make sure position is valid
+                if 0 <= pos[0] < self.grid_size and 0 <= pos[1] < self.grid_size and pos not in self.obstacles:
+                    self.cell_positions[i] = pos
+                    self.cell_controllers[i].set_position(pos)
+
+            # Verify connectivity again
+            graph = self._build_connectivity_graph(self.cell_positions)
+            is_connected = self._is_connected(graph)
+
+            print(f"Second attempt: Placed {len(self.cell_positions)} cells in a {'connected' if is_connected else 'DISCONNECTED'} formation")
+
     def initialize_cells_with_positions(self, strategy=None, start_positions=None):
         """
         Initialize cells with specified starting positions and assign targets.
+        If keep_cells_connected is True and provided positions aren't connected,
+        they will be rearranged to ensure connectivity.
 
         Args:
             strategy (dict): Movement strategy parameters
@@ -105,11 +254,6 @@ class SimulationEnvironment:
             # Fall back to random positions if no positions provided
             return self.initialize_cells(strategy)
 
-        # If we have fewer starting positions than cells, we'll use what we have
-        # and randomly place the rest
-        use_random_for_remaining = len(start_positions) < self.num_cells
-        print(f"Using {len(start_positions)} custom positions for {self.num_cells} cells")
-
         # Initialize dictionaries
         self.cell_controllers = {}
         self.cell_positions = {}
@@ -118,6 +262,26 @@ class SimulationEnvironment:
         # Create cell controllers
         for i in range(self.num_cells):
             self.cell_controllers[i] = CellController(i, self.grid_size, strategy)
+
+        # If connectivity is required, check if provided positions are connected
+        if self.keep_cells_connected and len(start_positions) >= 2:
+            # Create a temporary positions dictionary to check connectivity
+            temp_positions = {}
+            for i, pos in enumerate(start_positions[:self.num_cells]):
+                if (0 <= pos[0] < self.grid_size and
+                    0 <= pos[1] < self.grid_size and
+                    pos not in self.obstacles):
+                    temp_positions[i] = pos
+
+            # Check if these positions form a connected graph
+            temp_graph = self._build_connectivity_graph(temp_positions)
+            if not self._is_connected(temp_graph):
+                print("Warning: Provided start positions are not connected. Using connected formation instead.")
+                # Use connected formation instead
+                self._place_cells_in_connected_formation()
+                return
+
+        print(f"Using {len(start_positions)} custom positions for {self.num_cells} cells")
 
         # Get available positions for random placement if needed
         available_positions = []
@@ -152,7 +316,31 @@ class SimulationEnvironment:
                         self.cell_positions[i] = random_pos
                         self.cell_controllers[i].set_position(random_pos)
             else:
-                # Use random position for remaining cells
+                # If connectivity is required, place remaining cells adjacent to existing ones
+                if self.keep_cells_connected and self.cell_positions:
+                    # Find all possible adjacent positions to the current formation
+                    placed_positions = set(self.cell_positions.values())
+                    possible_positions = set()
+
+                    for pos in placed_positions:
+                        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                            new_pos = (pos[0] + dr, pos[1] + dc)
+
+                            # Check if position is valid
+                            if (0 <= new_pos[0] < self.grid_size and
+                                0 <= new_pos[1] < self.grid_size and
+                                new_pos not in self.obstacles and
+                                new_pos not in placed_positions):
+                                possible_positions.add(new_pos)
+
+                    if possible_positions:
+                        # Choose a random adjacent position
+                        next_pos = random.choice(list(possible_positions))
+                        self.cell_positions[i] = next_pos
+                        self.cell_controllers[i].set_position(next_pos)
+                        continue
+
+                # Fall back to random placement if needed
                 if available_positions:
                     random_pos = available_positions.pop(0)
                     self.cell_positions[i] = random_pos
@@ -316,6 +504,10 @@ class SimulationEnvironment:
             next_pos = controller.decide_move(occupied_positions)
             if next_pos is not None:
                 moves[cell_id] = next_pos
+
+        # Apply connectivity constraint if enabled
+        if self.keep_cells_connected:
+            moves = self._enforce_connectivity(moves)
 
         # Resolve conflicts (multiple cells trying to move to the same position)
         self._resolve_conflicts(moves)
@@ -491,6 +683,140 @@ class SimulationEnvironment:
 
         # No swap was made
         return False
+
+    def _enforce_connectivity(self, moves):
+        """
+        Enforce connectivity constraint (snake-like movement).
+        Ensures that all cells remain connected after movement.
+
+        Args:
+            moves (dict): Dictionary mapping cell_id to next position
+
+        Returns:
+            dict: Modified moves dictionary with connectivity enforced
+        """
+        if not moves:
+            return moves
+
+        # Create a copy of current positions that we'll update as we process moves
+        new_positions = self.cell_positions.copy()
+
+        # Get the current connectivity graph
+        current_graph = self._build_connectivity_graph(self.cell_positions)
+
+        # Check if cells are currently connected
+        if not self._is_connected(current_graph):
+            print("WARNING: Cells are not currently connected, cannot enforce connectivity")
+            # If cells are not already connected, we can't enforce connectivity
+            return moves
+
+        # Process moves in order of cell ID to ensure deterministic behavior
+        valid_moves = {}
+        for cell_id in sorted(moves.keys()):
+            next_pos = moves[cell_id]
+
+            # Temporarily apply this move
+            old_pos = new_positions[cell_id]
+            new_positions[cell_id] = next_pos
+
+            # Check if the move maintains connectivity
+            new_graph = self._build_connectivity_graph(new_positions)
+            if self._is_connected(new_graph):
+                # Move is valid, keep it
+                valid_moves[cell_id] = next_pos
+            else:
+                # Move breaks connectivity, revert it
+                new_positions[cell_id] = old_pos
+                # Print debug info
+                print(f"Cell {cell_id} move from {old_pos} to {next_pos} rejected - would break connectivity")
+
+        if len(valid_moves) < len(moves):
+            print(f"Connectivity enforced: {len(valid_moves)}/{len(moves)} moves allowed")
+
+        return valid_moves
+
+    def _build_connectivity_graph(self, positions):
+        """
+        Build a graph representing cell connectivity.
+
+        Args:
+            positions (dict): Dictionary mapping cell_id to position
+
+        Returns:
+            dict: Adjacency list representation of the graph
+        """
+        graph = {cell_id: [] for cell_id in positions}
+
+        # Add edges between adjacent cells
+        cell_ids = list(positions.keys())
+
+        # Only print detailed debug info for small numbers of cells
+        if len(cell_ids) <= 5:
+            # Print positions for debugging
+            position_list = [(cell_id, positions[cell_id]) for cell_id in cell_ids]
+            print(f"Building connectivity graph for positions: {position_list}")
+        else:
+            print(f"Building connectivity graph for {len(cell_ids)} cells")
+
+        for i, cell_id1 in enumerate(cell_ids):
+            pos1 = positions[cell_id1]
+            for cell_id2 in cell_ids:
+                if cell_id1 == cell_id2:
+                    continue
+
+                pos2 = positions[cell_id2]
+
+                # Check if cells are adjacent (Manhattan distance = 1)
+                manhattan_dist = abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+                if manhattan_dist == 1:
+                    graph[cell_id1].append(cell_id2)
+
+        # Count connections
+        total_connections = sum(len(neighbors) for neighbors in graph.values())
+        print(f"Connectivity graph has {total_connections} connections between {len(cell_ids)} cells")
+
+        return graph
+
+    def _is_connected(self, graph):
+        """
+        Check if the graph is connected (all cells can reach each other).
+
+        Args:
+            graph (dict): Adjacency list representation of the graph
+
+        Returns:
+            bool: True if graph is connected, False otherwise
+        """
+        if not graph:
+            return True
+
+        # Perform BFS from the first cell
+        start_node = next(iter(graph.keys()))
+        visited = {start_node}
+        queue = [start_node]
+
+        # Only print detailed debug for small graphs
+        if len(graph) <= 5:
+            print(f"Starting connectivity check from node {start_node}")
+
+        while queue:
+            node = queue.pop(0)
+            for neighbor in graph[node]:
+                if neighbor not in visited:
+                    if len(graph) <= 5:
+                        print(f"  Visiting neighbor {neighbor} from {node}")
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+
+        # Check if all nodes were visited
+        is_connected = len(visited) == len(graph)
+
+        if not is_connected:
+            print(f"WARNING: Graph is not connected! Visited {len(visited)}/{len(graph)} nodes")
+            print(f"Visited nodes: {visited}")
+            print(f"All nodes: {list(graph.keys())}")
+
+        return is_connected
 
     def _resolve_conflicts(self, moves):
         """
