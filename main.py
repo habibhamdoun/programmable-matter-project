@@ -889,6 +889,26 @@ class EvolutionaryApp:
             messagebox.showinfo("Training Complete",
                                "Training completed successfully! You can now simulate the best model or save it for later use.")
 
+        def training_error(error_msg):
+            # Update status
+            self.status_var.set(f"Training failed: {error_msg}")
+
+            # Reset progress bar
+            self.progress_var.set(0)
+
+            # Enable buttons
+            self.initialize_btn.config(state=tk.NORMAL)
+            self.train_btn.config(state=tk.NORMAL)
+            self.load_btn.config(state=tk.NORMAL)
+
+            # Re-enable the train custom button if it exists
+            if hasattr(self, 'train_custom_btn'):
+                self.train_custom_btn.config(state=tk.NORMAL)
+
+            # Show error message
+            messagebox.showerror("Training Error",
+                               f"Training failed with error: {error_msg}\n\nPlease try again with different parameters.")
+
         # Start training thread
         thread = threading.Thread(target=training_thread)
         thread.daemon = True
