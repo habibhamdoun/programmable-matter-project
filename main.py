@@ -95,9 +95,53 @@ class EvolutionaryApp:
 
         # Movement constraints
         ttk.Label(train_frame, text="Movement Constraints:").grid(row=3, column=0, sticky=tk.W, pady=2)
+
+        # Create a frame for the checkboxes
+        constraints_frame = ttk.Frame(train_frame)
+        constraints_frame.grid(row=3, column=1, sticky=tk.W, pady=2)
+
         self.main_keep_connected_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(train_frame, text="Keep cells connected",
-                       variable=self.main_keep_connected_var).grid(row=3, column=1, sticky=tk.W, pady=2)
+        ttk.Checkbutton(constraints_frame, text="Keep cells connected",
+                       variable=self.main_keep_connected_var,
+                       command=self._update_leader_checkbox_state).pack(anchor=tk.W)
+
+        # Add leader checkbox
+        self.main_has_leader_var = tk.BooleanVar(value=False)
+        self.main_leader_checkbox = ttk.Checkbutton(constraints_frame, text="Use leader cell",
+                                                  variable=self.main_has_leader_var,
+                                                  state=tk.DISABLED)
+        self.main_leader_checkbox.pack(anchor=tk.W)
+
+        # Priority factors
+        priority_frame = ttk.LabelFrame(left_panel, text="Movement Priorities", padding=10)
+        priority_frame.pack(fill=tk.X, pady=(0, 10))
+
+        # Inside-Out Priority
+        ttk.Label(priority_frame, text="Inside-Out Priority:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.inside_out_priority_var = tk.DoubleVar(value=0.6)
+        inside_out_scale = ttk.Scale(priority_frame, from_=0.0, to=1.0, orient=tk.HORIZONTAL,
+                                   variable=self.inside_out_priority_var)
+        inside_out_scale.grid(row=0, column=1, sticky=tk.EW, pady=2)
+        ttk.Label(priority_frame, text="0.0").grid(row=0, column=2, sticky=tk.W, padx=(5, 0))
+        ttk.Label(priority_frame, text="1.0").grid(row=0, column=3, sticky=tk.E)
+
+        # Connectivity Priority
+        ttk.Label(priority_frame, text="Connectivity Priority:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        self.connectivity_priority_var = tk.DoubleVar(value=0.5)
+        connectivity_scale = ttk.Scale(priority_frame, from_=0.0, to=1.0, orient=tk.HORIZONTAL,
+                                     variable=self.connectivity_priority_var)
+        connectivity_scale.grid(row=1, column=1, sticky=tk.EW, pady=2)
+        ttk.Label(priority_frame, text="0.0").grid(row=1, column=2, sticky=tk.W, padx=(5, 0))
+        ttk.Label(priority_frame, text="1.0").grid(row=1, column=3, sticky=tk.E)
+
+        # Efficiency Priority
+        ttk.Label(priority_frame, text="Efficiency Priority:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        self.efficiency_priority_var = tk.DoubleVar(value=0.7)
+        efficiency_scale = ttk.Scale(priority_frame, from_=0.0, to=1.0, orient=tk.HORIZONTAL,
+                                   variable=self.efficiency_priority_var)
+        efficiency_scale.grid(row=2, column=1, sticky=tk.EW, pady=2)
+        ttk.Label(priority_frame, text="0.0").grid(row=2, column=2, sticky=tk.W, padx=(5, 0))
+        ttk.Label(priority_frame, text="1.0").grid(row=2, column=3, sticky=tk.E)
 
         # Action buttons
         button_frame = ttk.Frame(left_panel)
@@ -109,6 +153,9 @@ class EvolutionaryApp:
         self.train_btn = ttk.Button(button_frame, text="Train", command=self.train, state=tk.DISABLED)
         self.train_btn.pack(fill=tk.X, pady=2)
 
+        self.pause_btn = ttk.Button(button_frame, text="Pause/Resume", command=self.toggle_pause, state=tk.DISABLED)
+        self.pause_btn.pack(fill=tk.X, pady=2)
+
         self.simulate_btn = ttk.Button(button_frame, text="Simulate Best", command=self.simulate_best, state=tk.DISABLED)
         self.simulate_btn.pack(fill=tk.X, pady=2)
 
@@ -119,8 +166,14 @@ class EvolutionaryApp:
         self.save_btn = ttk.Button(button_frame, text="Save Model", command=self.save_model, state=tk.DISABLED)
         self.save_btn.pack(fill=tk.X, pady=2)
 
+        self.save_state_btn = ttk.Button(button_frame, text="Save Training State", command=self.save_training_state, state=tk.DISABLED)
+        self.save_state_btn.pack(fill=tk.X, pady=2)
+
         self.load_btn = ttk.Button(button_frame, text="Load Model", command=self.load_model)
         self.load_btn.pack(fill=tk.X, pady=2)
+
+        self.load_state_btn = ttk.Button(button_frame, text="Load Training State", command=self.load_training_state)
+        self.load_state_btn.pack(fill=tk.X, pady=2)
 
         # Status
         status_frame = ttk.LabelFrame(left_panel, text="Status", padding=10)
@@ -279,7 +332,15 @@ class EvolutionaryApp:
 
         self.keep_connected_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(movement_frame, text="Keep cells connected (snake-like movement)",
-                       variable=self.keep_connected_var).pack(anchor=tk.W)
+                       variable=self.keep_connected_var,
+                       command=self._update_custom_leader_checkbox_state).pack(anchor=tk.W)
+
+        # Add leader checkbox
+        self.has_leader_var = tk.BooleanVar(value=False)
+        self.leader_checkbox = ttk.Checkbutton(movement_frame, text="Use leader cell",
+                                             variable=self.has_leader_var,
+                                             state=tk.DISABLED)
+        self.leader_checkbox.pack(anchor=tk.W)
 
         # Training parameters
         params_frame = ttk.LabelFrame(training_options_frame, text="Training Parameters", padding=5)
@@ -554,18 +615,26 @@ class EvolutionaryApp:
             max_generations=self.max_generations
         )
 
-        # Create simulation environment
+        # Create simulation environment with priority parameters
         self.simulation_env = SimulationEnvironment(
             grid_size=self.grid_size,
             target_shape=self.target_shape,
             obstacles=self.obstacles,
-            num_cells=self.num_cells
+            num_cells=self.num_cells,
+            inside_out_priority=self.inside_out_priority_var.get(),
+            connectivity_priority=self.connectivity_priority_var.get(),
+            efficiency_priority=self.efficiency_priority_var.get()
         )
 
         # Set connectivity constraint if enabled
         if hasattr(self, 'main_keep_connected_var'):
             self.simulation_env.keep_cells_connected = self.main_keep_connected_var.get()
             print(f"Main tab - Keep cells connected: {self.simulation_env.keep_cells_connected}")
+
+            # Set leader if enabled
+            if hasattr(self, 'main_has_leader_var'):
+                self.simulation_env.has_leader = self.main_has_leader_var.get() and self.main_keep_connected_var.get()
+                print(f"Main tab - Has leader: {self.simulation_env.has_leader}")
 
         # Initialize cells with default strategy
         self.simulation_env.initialize_cells()
@@ -580,6 +649,12 @@ class EvolutionaryApp:
         # Enable train button
         self.train_btn.config(state=tk.NORMAL)
 
+        # Disable pause button
+        self.pause_btn.config(state=tk.DISABLED)
+
+        # Disable save state button
+        self.save_state_btn.config(state=tk.DISABLED)
+
     def train(self):
         """Train the population using evolutionary algorithm"""
         if not self.trainer:
@@ -592,12 +667,116 @@ class EvolutionaryApp:
         self.simulate_btn.config(state=tk.DISABLED)
         self.save_btn.config(state=tk.DISABLED)
         self.load_btn.config(state=tk.DISABLED)
+        self.load_state_btn.config(state=tk.DISABLED)
+
+        # Enable pause button
+        self.pause_btn.config(state=tk.NORMAL, text="Pause")
+
+        # Enable save state button
+        self.save_state_btn.config(state=tk.NORMAL)
 
         # Update status
         self.status_var.set("Training in progress...")
 
         # Start training with default shape and obstacles
         self._start_training(self.target_shape, self.obstacles)
+
+    def toggle_pause(self):
+        """Toggle pause/resume training"""
+        if not self.trainer:
+            return
+
+        # Toggle pause state in the trainer
+        if hasattr(self.trainer, 'paused'):
+            if self.trainer.paused:
+                # Resume training
+                self.trainer.paused = False
+                self.pause_btn.config(text="Pause")
+
+                # Update status
+                self.status_var.set(f"Resuming training from generation {self.trainer.current_generation + 1}...")
+
+                # Resume training in a separate thread
+                import threading
+                thread = threading.Thread(target=self.trainer.resume_training)
+                thread.daemon = True
+                thread.start()
+            else:
+                # Pause training
+                self.trainer.paused = True
+                self.pause_btn.config(text="Resume")
+
+                # Update status
+                self.status_var.set(f"Training paused at generation {self.trainer.current_generation + 1}")
+
+    def save_training_state(self):
+        """Save the current training state"""
+        if not self.trainer:
+            messagebox.showerror("Error", "No trainer available.")
+            return
+
+        # Ask for file location
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            title="Save Training State"
+        )
+
+        if not file_path:
+            return  # User cancelled
+
+        # Save the training state
+        success = self.trainer.save_training_state(file_path)
+
+        if success:
+            messagebox.showinfo("Success", f"Training state saved to {file_path}")
+        else:
+            messagebox.showerror("Error", "Failed to save training state")
+
+    def load_training_state(self):
+        """Load a saved training state"""
+        # Ask for file location
+        file_path = filedialog.askopenfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            title="Load Training State"
+        )
+
+        if not file_path:
+            return  # User cancelled
+
+        # Create a new trainer if needed
+        if not self.trainer:
+            self.initialize()
+
+        # Load the training state
+        success = self.trainer.load_training_state(file_path)
+
+        if success:
+            # Update UI
+            self.best_individual = self.trainer.best_individual
+            self.best_fitness_history = self.trainer.best_fitness_history
+            self.avg_fitness_history = self.trainer.avg_fitness_history
+
+            # Update plot
+            self._update_plot()
+
+            # Update status
+            self.status_var.set(f"Training state loaded. Current generation: {self.trainer.current_generation}")
+
+            # Enable buttons
+            self.train_btn.config(state=tk.NORMAL)
+            self.pause_btn.config(state=tk.NORMAL)
+            self.save_state_btn.config(state=tk.NORMAL)
+
+            if self.best_individual:
+                self.simulate_btn.config(state=tk.NORMAL)
+                self.save_btn.config(state=tk.NORMAL)
+                self.test_model_btn.config(state=tk.NORMAL)
+
+            messagebox.showinfo("Success", f"Training state loaded from {file_path}")
+        else:
+            messagebox.showerror("Error", "Failed to load training state")
 
     def _train_on_custom_shape(self):
         """Train the model on the custom shape and obstacles"""
@@ -615,7 +794,14 @@ class EvolutionaryApp:
         self.simulate_btn.config(state=tk.DISABLED)
         self.save_btn.config(state=tk.DISABLED)
         self.load_btn.config(state=tk.DISABLED)
+        self.load_state_btn.config(state=tk.DISABLED)
         self.train_custom_btn.config(state=tk.DISABLED)
+
+        # Enable pause button
+        self.pause_btn.config(state=tk.NORMAL, text="Pause")
+
+        # Enable save state button
+        self.save_state_btn.config(state=tk.NORMAL)
 
         # Update status
         self.status_var.set("Training on custom shape...")
@@ -660,6 +846,27 @@ class EvolutionaryApp:
                     start_positions = self.custom_start_positions
                     print(f"Using {len(start_positions)} custom starting positions for training")
 
+            # Get connectivity constraint setting
+            keep_connected = False
+            has_leader = False
+
+            if hasattr(self, 'main_keep_connected_var'):
+                keep_connected = self.main_keep_connected_var.get()
+                print(f"Using main tab connectivity setting: {keep_connected}")
+
+                # Get leader setting from main tab
+                if hasattr(self, 'main_has_leader_var'):
+                    has_leader = self.main_has_leader_var.get() and keep_connected
+                    print(f"Using main tab leader setting: {has_leader}")
+            elif hasattr(self, 'keep_connected_var'):
+                keep_connected = self.keep_connected_var.get()
+                print(f"Using custom tab connectivity setting: {keep_connected}")
+
+                # Get leader setting from custom tab
+                if hasattr(self, 'has_leader_var'):
+                    has_leader = self.has_leader_var.get() and keep_connected
+                    print(f"Using custom tab leader setting: {has_leader}")
+
             # Create a new trainer with the custom shape, obstacles, and training parameters
             self.trainer = EvolutionaryTrainer(
                 grid_size=self.grid_size,
@@ -670,7 +877,9 @@ class EvolutionaryApp:
                 genome_size=8,
                 max_generations=max_generations,
                 mutation_rate=mutation_rate,
-                app=self  # Pass reference to the main app
+                app=self,  # Pass reference to the main app
+                keep_cells_connected=keep_connected,  # Pass connectivity constraint
+                has_leader=has_leader  # Pass leader setting
             )
 
             # If the population size is the same, use the existing population
@@ -709,6 +918,27 @@ class EvolutionaryApp:
                     start_positions = self.custom_start_positions
                     print(f"Using {len(start_positions)} custom starting positions for training")
 
+            # Get connectivity constraint setting
+            keep_connected = False
+            has_leader = False
+
+            if hasattr(self, 'main_keep_connected_var'):
+                keep_connected = self.main_keep_connected_var.get()
+                print(f"Using main tab connectivity setting: {keep_connected}")
+
+                # Get leader setting from main tab
+                if hasattr(self, 'main_has_leader_var'):
+                    has_leader = self.main_has_leader_var.get() and keep_connected
+                    print(f"Using main tab leader setting: {has_leader}")
+            elif hasattr(self, 'keep_connected_var'):
+                keep_connected = self.keep_connected_var.get()
+                print(f"Using custom tab connectivity setting: {keep_connected}")
+
+                # Get leader setting from custom tab
+                if hasattr(self, 'has_leader_var'):
+                    has_leader = self.has_leader_var.get() and keep_connected
+                    print(f"Using custom tab leader setting: {has_leader}")
+
             # Create a new trainer with the custom shape, obstacles, and training parameters
             self.trainer = EvolutionaryTrainer(
                 grid_size=self.grid_size,
@@ -719,7 +949,9 @@ class EvolutionaryApp:
                 genome_size=8,
                 max_generations=max_generations,
                 mutation_rate=mutation_rate,
-                app=self  # Pass reference to the main app
+                app=self,  # Pass reference to the main app
+                keep_cells_connected=keep_connected,  # Pass connectivity constraint
+                has_leader=has_leader  # Pass leader setting
             )
 
         # Configure trainer for shape/obstacle randomization
@@ -781,25 +1013,38 @@ class EvolutionaryApp:
 
         # Define simulation function for fitness evaluation
         def simulation_func(strategy, visualize=False):
-            # Create a new simulation environment for each evaluation
+            # Create a new simulation environment for each evaluation with priority parameters
             env = SimulationEnvironment(
                 grid_size=self.grid_size,
                 target_shape=target_shape,  # Use the passed target_shape
                 obstacles=obstacles,        # Use the passed obstacles
-                num_cells=len(target_shape) # Use the length of the target shape
+                num_cells=len(target_shape), # Use the length of the target shape
+                inside_out_priority=self.inside_out_priority_var.get(),
+                connectivity_priority=self.connectivity_priority_var.get(),
+                efficiency_priority=self.efficiency_priority_var.get()
             )
 
-            # Set connectivity constraint if enabled - check both tabs
-            if hasattr(self, 'main_keep_connected_var'):
-                # Use the main tab's checkbox
-                env.keep_cells_connected = self.main_keep_connected_var.get()
-                if visualize:
-                    print(f"Training - Using main tab connectivity: {env.keep_cells_connected}")
-            elif hasattr(self, 'keep_connected_var'):
-                # Fall back to custom tab's checkbox
-                env.keep_cells_connected = self.keep_connected_var.get()
-                if visualize:
-                    print(f"Training - Using custom tab connectivity: {env.keep_cells_connected}")
+            # Set connectivity constraint - use the trainer's setting which was set during initialization
+            env.keep_cells_connected = self.trainer.keep_cells_connected
+
+            # Set leader setting if enabled
+            if hasattr(self.trainer, 'has_leader'):
+                env.has_leader = self.trainer.has_leader
+                print(f"Training - Using trainer's leader setting: {env.has_leader}")
+
+            # Debug output
+            if visualize:
+                print(f"Training - Using trainer's connectivity setting: {env.keep_cells_connected}")
+
+                # Also show the tab settings for debugging
+                if hasattr(self, 'main_keep_connected_var'):
+                    print(f"Training - Main tab connectivity setting: {self.main_keep_connected_var.get()}")
+                    if hasattr(self, 'main_has_leader_var'):
+                        print(f"Training - Main tab leader setting: {self.main_has_leader_var.get()}")
+                if hasattr(self, 'keep_connected_var'):
+                    print(f"Training - Custom tab connectivity setting: {self.keep_connected_var.get()}")
+                    if hasattr(self, 'has_leader_var'):
+                        print(f"Training - Custom tab leader setting: {self.has_leader_var.get()}")
 
             # Initialize cells with the strategy and custom starting positions if enabled
             if hasattr(self, 'use_custom_start_var') and self.use_custom_start_var.get():
@@ -863,9 +1108,10 @@ class EvolutionaryApp:
                 self.root.after(0, training_complete)
             except Exception as e:
                 # Handle any errors during training
-                print(f"Training error: {e}")
-                # Update UI to show error
-                self.root.after(0, lambda: training_error(str(e)))
+                error_message = str(e)
+                print(f"Training error: {error_message}")
+                # Update UI to show error - capture the error message in a local variable
+                self.root.after(0, lambda error_msg=error_message: training_error(error_msg))
 
         def training_complete():
             # Update status
@@ -877,6 +1123,18 @@ class EvolutionaryApp:
             self.simulate_btn.config(state=tk.NORMAL)
             self.save_btn.config(state=tk.NORMAL)
             self.load_btn.config(state=tk.NORMAL)
+            self.load_state_btn.config(state=tk.NORMAL)
+
+            # Disable pause button
+            self.pause_btn.config(state=tk.DISABLED)
+
+            # Update save state button
+            self.save_state_btn.config(state=tk.NORMAL)
+
+            # Enable the test model button
+            if hasattr(self, 'test_model_btn'):
+                self.test_model_btn.config(state=tk.NORMAL)
+                print("Test model button enabled after training")
 
             # Re-enable the train custom button if it exists
             if hasattr(self, 'train_custom_btn'):
@@ -887,7 +1145,7 @@ class EvolutionaryApp:
 
             # Suggest saving the model
             messagebox.showinfo("Training Complete",
-                               "Training completed successfully! You can now simulate the best model or save it for later use.")
+                               "Training completed successfully! You can now simulate the best model, test it on custom shapes, or save it for later use.")
 
         def training_error(error_msg):
             # Update status
@@ -900,6 +1158,16 @@ class EvolutionaryApp:
             self.initialize_btn.config(state=tk.NORMAL)
             self.train_btn.config(state=tk.NORMAL)
             self.load_btn.config(state=tk.NORMAL)
+            self.load_state_btn.config(state=tk.NORMAL)
+
+            # Disable pause button
+            self.pause_btn.config(state=tk.DISABLED)
+
+            # Update save state button if we have a partial training state
+            if hasattr(self.trainer, 'best_individual') and self.trainer.best_individual:
+                self.save_state_btn.config(state=tk.NORMAL)
+            else:
+                self.save_state_btn.config(state=tk.DISABLED)
 
             # Re-enable the train custom button if it exists
             if hasattr(self, 'train_custom_btn'):
@@ -923,12 +1191,15 @@ class EvolutionaryApp:
         # Get strategy from best individual
         strategy = self.best_individual.get_movement_strategy()
 
-        # Create a new simulation environment
+        # Create a new simulation environment with priority parameters
         self.simulation_env = SimulationEnvironment(
             grid_size=self.grid_size,
             target_shape=self.target_shape,
             obstacles=self.obstacles,
-            num_cells=self.num_cells
+            num_cells=self.num_cells,
+            inside_out_priority=self.inside_out_priority_var.get(),
+            connectivity_priority=self.connectivity_priority_var.get(),
+            efficiency_priority=self.efficiency_priority_var.get()
         )
 
         # Set connectivity constraint if enabled - check both tabs
@@ -936,10 +1207,20 @@ class EvolutionaryApp:
             # Use the main tab's checkbox
             self.simulation_env.keep_cells_connected = self.main_keep_connected_var.get()
             print(f"Simulate best - Using main tab connectivity: {self.simulation_env.keep_cells_connected}")
+
+            # Set leader if enabled
+            if hasattr(self, 'main_has_leader_var'):
+                self.simulation_env.has_leader = self.main_has_leader_var.get() and self.main_keep_connected_var.get()
+                print(f"Simulate best - Using main tab leader setting: {self.simulation_env.has_leader}")
         elif hasattr(self, 'keep_connected_var'):
             # Fall back to custom tab's checkbox
             self.simulation_env.keep_cells_connected = self.keep_connected_var.get()
             print(f"Simulate best - Using custom tab connectivity: {self.simulation_env.keep_cells_connected}")
+
+            # Set leader if enabled
+            if hasattr(self, 'has_leader_var'):
+                self.simulation_env.has_leader = self.has_leader_var.get() and self.keep_connected_var.get()
+                print(f"Simulate best - Using custom tab leader setting: {self.simulation_env.has_leader}")
 
         # Initialize cells with the best strategy
         self.simulation_env.initialize_cells(strategy)
@@ -1506,15 +1787,29 @@ class EvolutionaryApp:
             num_cells=len(self.custom_target_shape)
         )
 
-        # Set connectivity constraint if enabled - check both tabs
-        if hasattr(self, 'main_keep_connected_var'):
-            # Use the main tab's checkbox
-            test_env.keep_cells_connected = self.main_keep_connected_var.get()
-            print(f"Test model - Using main tab connectivity: {test_env.keep_cells_connected}")
-        elif hasattr(self, 'keep_connected_var'):
-            # Fall back to custom tab's checkbox
+        # Set connectivity constraint - check both tabs
+        # First check the custom tab since we're in the custom shapes section
+        if hasattr(self, 'keep_connected_var'):
             test_env.keep_cells_connected = self.keep_connected_var.get()
             print(f"Test model - Using custom tab connectivity: {test_env.keep_cells_connected}")
+
+            # Set leader if enabled
+            if hasattr(self, 'has_leader_var'):
+                test_env.has_leader = self.has_leader_var.get() and test_env.keep_cells_connected
+                print(f"Test model - Using custom tab leader setting: {test_env.has_leader}")
+        # Then check the main tab as fallback
+        elif hasattr(self, 'main_keep_connected_var'):
+            test_env.keep_cells_connected = self.main_keep_connected_var.get()
+            print(f"Test model - Using main tab connectivity: {test_env.keep_cells_connected}")
+
+            # Set leader if enabled
+            if hasattr(self, 'main_has_leader_var'):
+                test_env.has_leader = self.main_has_leader_var.get() and test_env.keep_cells_connected
+                print(f"Test model - Using main tab leader setting: {test_env.has_leader}")
+
+        # Debug output
+        print(f"Test model - Final connectivity setting: {test_env.keep_cells_connected}")
+        print(f"Test model - Final leader setting: {test_env.has_leader}")
 
         # Check if we have custom starting positions
         use_custom_start = False
@@ -1635,6 +1930,25 @@ class EvolutionaryApp:
         self.train_btn.config(state=tk.DISABLED)
         self.simulate_btn.config(state=tk.DISABLED)
         self.save_btn.config(state=tk.DISABLED)
+        self.pause_btn.config(state=tk.DISABLED)
+        self.save_state_btn.config(state=tk.DISABLED)
+        self.load_state_btn.config(state=tk.NORMAL)
+
+    def _update_leader_checkbox_state(self):
+        """Update the state of the leader checkbox based on the connected checkbox"""
+        if self.main_keep_connected_var.get():
+            self.main_leader_checkbox.config(state=tk.NORMAL)
+        else:
+            self.main_has_leader_var.set(False)
+            self.main_leader_checkbox.config(state=tk.DISABLED)
+
+    def _update_custom_leader_checkbox_state(self):
+        """Update the state of the custom leader checkbox based on the connected checkbox"""
+        if self.keep_connected_var.get():
+            self.leader_checkbox.config(state=tk.NORMAL)
+        else:
+            self.has_leader_var.set(False)
+            self.leader_checkbox.config(state=tk.DISABLED)
 
 if __name__ == "__main__":
     root = tk.Tk()

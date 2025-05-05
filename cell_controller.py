@@ -40,6 +40,16 @@ class CellController:
         self.original_target = None  # Original target when yielding
         self.yield_countdown = 0  # Countdown for how long to yield
 
+        # Leader state
+        self.is_leader = False  # Whether this cell is the leader
+        self.following_leader = False  # Whether this cell is following the leader
+        self.leader_position = None  # Position of the leader cell
+
+        # Priority factors (can be adjusted by user)
+        self.inside_out_priority = self.strategy.get('inside_out_priority', 0.6)  # Default: 0.6
+        self.connectivity_priority = self.strategy.get('connectivity_priority', 0.5)  # Default: 0.5
+        self.efficiency_priority = self.strategy.get('efficiency_priority', 0.7)  # Default: 0.7
+
     def _default_strategy(self):
         """Default strategy if none provided"""
         return {
@@ -53,6 +63,9 @@ class CellController:
             'risk_tolerance': 0.3,
             'yield_willingness': 0.7,  # Willingness to yield to other cells
             'yield_duration': 3,       # How long to yield for
+            'inside_out_priority': 0.6, # Priority for filling shapes from inside out (0.0-1.0)
+            'connectivity_priority': 0.5, # Priority for maintaining connectivity (0.0-1.0)
+            'efficiency_priority': 0.7, # Priority for efficiency (fewer steps) vs accuracy (0.0-1.0)
         }
 
     def set_position(self, position):
@@ -91,6 +104,15 @@ class CellController:
         for cell_id, position in other_cells.items():
             if cell_id != self.cell_id:
                 self.other_cells_memory[cell_id] = position
+
+                # If this is the leader cell (cell_id 0), track its position
+                if cell_id == 0 and not self.is_leader:
+                    self.leader_position = position
+                    # If we're following the leader, update our following state
+                    if self.following_leader:
+                        # If we're too far from the leader, stop following
+                        if self._manhattan_distance(self.position, position) > 3:
+                            self.following_leader = False
 
         # Check if we're blocking another cell's path and should yield
         # Use a default value if 'yield_willingness' is not in the strategy
@@ -281,6 +303,31 @@ class CellController:
                 if least_visited_candidates:
                     return random.choice(least_visited_candidates)
 
+        # If we're not the leader and should follow the leader
+        if not self.is_leader and self.leader_position and not self.is_yielding:
+            # Check if we should start following the leader
+            if not self.following_leader:
+                # Start following if we're close to the leader
+                if self._manhattan_distance(self.position, self.leader_position) <= 3:
+                    self.following_leader = True
+
+            # If we're following the leader, prioritize moves that get us closer to the leader
+            if self.following_leader:
+                # Find the move that gets us closest to the leader
+                leader_moves = []
+                for move in possible_moves:
+                    distance_to_leader = self._manhattan_distance(move, self.leader_position)
+                    # We want to stay close but not on the same position
+                    if distance_to_leader > 0:
+                        leader_moves.append((move, distance_to_leader))
+
+                if leader_moves:
+                    # Sort by distance to leader (ascending)
+                    leader_moves.sort(key=lambda x: x[1])
+                    # Choose one of the closest positions to the leader
+                    best_leader_moves = [move for move, _ in leader_moves[:min(3, len(leader_moves))]]
+                    return random.choice(best_leader_moves)
+
         # Score each move
         scored_moves = []
         for move in possible_moves:
@@ -390,21 +437,35 @@ class CellController:
 
         # Distance to target center (lower is better)
         distance_to_target_center = self._manhattan_distance(move, target_center)
-        target_center_score = 1.0 / (distance_to_target_center + 1)
+        target_center_score = 1.5 / (distance_to_target_center + 1)  # Base weight for center priority
 
-        # ENHANCED: If we're stuck, prioritize moving toward the center of the target shape
-        # rather than directly to our assigned target
+        # HIGH PRIORITY: Prioritize filling shapes from the inside out
+        # Use the user-adjustable inside_out_priority parameter
+        # The closer a position is to the center, the higher its priority
+        # inside_out_priority ranges from 0.0 (no inside-out priority) to 1.0 (maximum inside-out priority)
+        target_score = (1 - self.inside_out_priority) * target_score + self.inside_out_priority * target_center_score
+
+        # ENHANCED: If we're stuck, prioritize moving toward the center of the target shape even more
         if self.stuck_count > 5:
             # Gradually shift priority from individual target to target center as stuck count increases
-            stuck_factor = min(0.8, self.stuck_count * 0.05)
+            stuck_factor = min(0.9, self.stuck_count * 0.05)  # Increased max factor
             target_score = (1 - stuck_factor) * target_score + stuck_factor * target_center_score
+
+        # Calculate final score with user-adjustable priorities
+        # Adjust efficiency weight based on efficiency_priority (0.0-1.0)
+        # Higher efficiency_priority means more focus on taking fewer steps
+        adjusted_efficiency_weight = efficiency_weight * self.efficiency_priority
+
+        # Adjust cooperation based on connectivity_priority (0.0-1.0)
+        # Higher connectivity_priority means cells are more cooperative and stay connected
+        adjusted_cooperation = cooperation * (2.0 - self.connectivity_priority)
 
         # Calculate final score
         score = (
             target_weight * target_score -
             obstacle_weight * obstacle_proximity -
-            cooperation * other_cells_proximity +
-            efficiency_weight * efficiency_score +
+            adjusted_cooperation * other_cells_proximity +
+            adjusted_efficiency_weight * efficiency_score +
             (0.5 + center_boost + narrow_passage_factor) * center_score  # Add center prioritization with boost and narrow passage factor
         )
 

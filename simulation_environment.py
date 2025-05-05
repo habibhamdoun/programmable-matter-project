@@ -10,7 +10,8 @@ class SimulationEnvironment:
     Provides a framework for testing and visualizing different strategies.
     """
 
-    def __init__(self, grid_size, target_shape, obstacles=None, num_cells=None):
+    def __init__(self, grid_size, target_shape, obstacles=None, num_cells=None, keep_cells_connected=False, has_leader=False,
+                 inside_out_priority=0.6, connectivity_priority=0.5, efficiency_priority=0.7):
         """
         Initialize the simulation environment.
 
@@ -19,6 +20,11 @@ class SimulationEnvironment:
             target_shape (list): List of (row, col) positions representing the target shape
             obstacles (set): Set of (row, col) positions with obstacles
             num_cells (int): Number of cells to use (defaults to len(target_shape))
+            keep_cells_connected (bool): Whether to enforce connectivity between cells
+            has_leader (bool): Whether to use a leader cell when keep_cells_connected is True
+            inside_out_priority (float): Priority for filling shapes from inside out (0.0-1.0)
+            connectivity_priority (float): Priority for maintaining connectivity (0.0-1.0)
+            efficiency_priority (float): Priority for efficiency (fewer steps) vs accuracy (0.0-1.0)
         """
         self.grid_size = grid_size
         self.target_shape = target_shape
@@ -43,11 +49,19 @@ class SimulationEnvironment:
         self.end_time = None
 
         # Movement constraints
-        self.keep_cells_connected = False  # Snake-like movement constraint
+        self.keep_cells_connected = keep_cells_connected  # Snake-like movement constraint
+        self.has_leader = has_leader and keep_cells_connected  # Leader only works when cells are connected
+        self.leader_id = 0 if self.has_leader else None  # ID of the leader cell
+
+        # Priority factors (can be adjusted by user)
+        self.inside_out_priority = inside_out_priority  # Priority for filling shapes from inside out (0.0-1.0)
+        self.connectivity_priority = connectivity_priority  # Priority for maintaining connectivity (0.0-1.0)
+        self.efficiency_priority = efficiency_priority  # Priority for efficiency (fewer steps) vs accuracy (0.0-1.0)
 
         # UI elements
         self.ui_window = None
         self.canvas = None
+        self.status_label = None
         self.cell_size = 30
         self.animation_speed = 100  # ms between steps
 
@@ -73,9 +87,30 @@ class SimulationEnvironment:
         self.cell_positions = {}
         self.cell_targets = {}
 
-        # Create cell controllers
+        # Create cell controllers with priority parameters
         for i in range(self.num_cells):
+            # If strategy is None, create a default one
+            if strategy is None:
+                strategy = {}
+
+            # Add priority parameters to strategy
+            strategy['inside_out_priority'] = self.inside_out_priority
+            strategy['connectivity_priority'] = self.connectivity_priority
+            strategy['efficiency_priority'] = self.efficiency_priority
+
+            # Create cell controller with updated strategy
             self.cell_controllers[i] = CellController(i, self.grid_size, strategy)
+
+        # Set leader cell if enabled
+        if self.has_leader and self.keep_cells_connected:
+            # Use the first cell as the leader
+            self.leader_id = 0
+            print(f"Setting cell {self.leader_id} as the leader")
+
+            # Mark this cell as the leader in its controller
+            if self.leader_id in self.cell_controllers:
+                self.cell_controllers[self.leader_id].is_leader = True
+                print(f"Cell {self.leader_id} marked as leader")
 
         # Place cells at random positions
         if self.keep_cells_connected:
@@ -259,9 +294,30 @@ class SimulationEnvironment:
         self.cell_positions = {}
         self.cell_targets = {}
 
-        # Create cell controllers
+        # Create cell controllers with priority parameters
         for i in range(self.num_cells):
+            # If strategy is None, create a default one
+            if strategy is None:
+                strategy = {}
+
+            # Add priority parameters to strategy
+            strategy['inside_out_priority'] = self.inside_out_priority
+            strategy['connectivity_priority'] = self.connectivity_priority
+            strategy['efficiency_priority'] = self.efficiency_priority
+
+            # Create cell controller with updated strategy
             self.cell_controllers[i] = CellController(i, self.grid_size, strategy)
+
+        # Set leader cell if enabled
+        if self.has_leader and self.keep_cells_connected:
+            # Use the first cell as the leader
+            self.leader_id = 0
+            print(f"Setting cell {self.leader_id} as the leader")
+
+            # Mark this cell as the leader in its controller
+            if self.leader_id in self.cell_controllers:
+                self.cell_controllers[self.leader_id].is_leader = True
+                print(f"Cell {self.leader_id} marked as leader")
 
         # If connectivity is required, check if provided positions are connected
         if self.keep_cells_connected and len(start_positions) >= 2:
@@ -363,7 +419,8 @@ class SimulationEnvironment:
             for target_pos in self.target_shape:
                 self.cell_controllers[cell_id].target_memory.add(target_pos)
 
-        # Sort targets by distance from center (inner targets first)
+        # HIGH PRIORITY: Sort targets by distance from center (inner targets first)
+        # Use a stronger sorting to ensure inside-out filling
         sorted_targets = sorted(targets,
                                key=lambda pos: abs(pos[0] - center_row) + abs(pos[1] - center_col))
 
@@ -380,10 +437,16 @@ class SimulationEnvironment:
                 target_center_distance = abs(target_pos[0] - center_row) + abs(target_pos[1] - center_col)
                 cell_center_distance = abs(cell_pos[0] - center_row) + abs(cell_pos[1] - center_col)
 
-                # Adjust cost based on center proximity
+                # HIGH PRIORITY: Prioritize inside-out filling with a more balanced approach
                 # Cells closer to center get lower costs for inner targets
+                # Use a moderate weighting to ensure inside positions are filled first
                 center_factor = abs(cell_center_distance - target_center_distance)
-                adjusted_cost = distance + center_factor * 0.5
+
+                # Apply a penalty for outer targets based on inside_out_priority
+                # Higher inside_out_priority means stronger penalty for outer targets
+                # This makes inner targets more attractive when inside_out_priority is high
+                inside_priority_multiplier = 1.0 + (target_center_distance * (0.1 + self.inside_out_priority * 0.4))
+                adjusted_cost = distance * inside_priority_multiplier + center_factor * (0.5 + self.inside_out_priority * 0.5)
 
                 row_costs.append(adjusted_cost)
             cost_matrix.append(row_costs)
@@ -483,7 +546,7 @@ class SimulationEnvironment:
         return self.cell_positions, self.steps_taken
 
     def _step_simulation(self):
-        """Execute one step of the simulation"""
+        """Execute one step of the simulation with parallel movement support"""
         # Get current occupied positions
         occupied_positions = set(self.cell_positions.values())
 
@@ -508,6 +571,9 @@ class SimulationEnvironment:
         # Apply connectivity constraint if enabled
         if self.keep_cells_connected:
             moves = self._enforce_connectivity(moves)
+        else:
+            # For non-connected mode, enable parallel movement
+            moves = self._enable_parallel_movement(moves)
 
         # Resolve conflicts (multiple cells trying to move to the same position)
         self._resolve_conflicts(moves)
@@ -521,7 +587,12 @@ class SimulationEnvironment:
         """
         Rescue cells that have been stuck outside the formation for too long.
         This is a last resort mechanism for cells that can't be helped by target swapping.
+        Also handles dynamic leader selection when the current leader is stuck.
         """
+        # Check if we need to change the leader (only if we have a leader and cells are connected)
+        if self.has_leader and self.keep_cells_connected:
+            self._check_leader_deadlock()
+
         # Find cells that are severely stuck
         for cell_id, controller in self.cell_controllers.items():
             # If a cell has been stuck for a very long time, it needs rescue
@@ -544,6 +615,120 @@ class SimulationEnvironment:
 
                         # Reset stuck count
                         controller.stuck_count = 0
+
+    def _check_leader_deadlock(self):
+        """
+        Check if the current leader is in a deadlock situation and change the leader if necessary.
+        This helps prevent situations where the entire formation gets stuck because the leader can't move.
+        """
+        if not self.leader_id or self.leader_id not in self.cell_controllers:
+            return
+
+        leader_controller = self.cell_controllers[self.leader_id]
+
+        # Check if the leader is stuck
+        if leader_controller.stuck_count > 15:  # Leader is significantly stuck
+            print(f"Leader (cell {self.leader_id}) is stuck with stuck count {leader_controller.stuck_count}. Finding a new leader...")
+
+            # Find the cell that's making the most progress (lowest stuck count)
+            best_cell_id = None
+            lowest_stuck_count = float('inf')
+
+            for cell_id, controller in self.cell_controllers.items():
+                if cell_id != self.leader_id and controller.stuck_count < lowest_stuck_count:
+                    # Check if this cell is connected to the formation
+                    if self._is_connected_to_formation(cell_id):
+                        best_cell_id = cell_id
+                        lowest_stuck_count = controller.stuck_count
+
+            # If we found a better leader, change it
+            if best_cell_id is not None and lowest_stuck_count < leader_controller.stuck_count:
+                self._change_leader(best_cell_id)
+                print(f"Changed leader from cell {self.leader_id} to cell {best_cell_id}")
+
+    def _is_connected_to_formation(self, cell_id):
+        """
+        Check if a cell is connected to the main formation.
+
+        Args:
+            cell_id (int): ID of the cell to check
+
+        Returns:
+            bool: True if the cell is connected to the formation, False otherwise
+        """
+        if cell_id not in self.cell_positions:
+            return False
+
+        # Get the cell's position
+        cell_pos = self.cell_positions[cell_id]
+
+        # Check if it's adjacent to any other cell
+        for other_id, other_pos in self.cell_positions.items():
+            if other_id != cell_id:
+                # Calculate Manhattan distance
+                distance = abs(cell_pos[0] - other_pos[0]) + abs(cell_pos[1] - other_pos[1])
+                if distance == 1:  # Adjacent cells (not diagonal)
+                    return True
+
+        return False
+
+    def _change_leader(self, new_leader_id):
+        """
+        Change the leader to a new cell.
+
+        Args:
+            new_leader_id (int): ID of the new leader cell
+        """
+        if new_leader_id not in self.cell_controllers:
+            return
+
+        old_leader_id = self.leader_id
+
+        # Remove leader status from old leader
+        if self.leader_id in self.cell_controllers:
+            self.cell_controllers[self.leader_id].is_leader = False
+
+        # Set new leader
+        self.leader_id = new_leader_id
+        self.cell_controllers[new_leader_id].is_leader = True
+
+        # Update all other cells to follow the new leader
+        for cell_id, controller in self.cell_controllers.items():
+            if cell_id != new_leader_id:
+                controller.following_leader = True
+                controller.leader_position = self.cell_positions[new_leader_id]
+
+        # Reset stuck count for the new leader to give it a chance
+        self.cell_controllers[new_leader_id].stuck_count = 0
+
+        # Log the leader change
+        self._log_leader_change(old_leader_id, new_leader_id)
+
+    def _log_leader_change(self, old_leader_id, new_leader_id):
+        """
+        Log a leader change event and update the UI if available.
+
+        Args:
+            old_leader_id (int): ID of the previous leader
+            new_leader_id (int): ID of the new leader
+        """
+        # Print detailed log message
+        print(f"LEADER CHANGE: Cell {old_leader_id} → Cell {new_leader_id}")
+
+        if old_leader_id in self.cell_controllers and new_leader_id in self.cell_controllers:
+            old_pos = self.cell_positions[old_leader_id]
+            new_pos = self.cell_positions[new_leader_id]
+            old_stuck = self.cell_controllers[old_leader_id].stuck_count
+            print(f"  Old leader: Cell {old_leader_id} at position {old_pos} with stuck count {old_stuck}")
+            print(f"  New leader: Cell {new_leader_id} at position {new_pos}")
+
+        # Update UI if we have a status label
+        if hasattr(self, 'status_label') and self.status_label:
+            self.status_label.config(text=f"Leader changed from Cell {old_leader_id} to Cell {new_leader_id}")
+
+        # Force redraw to show the new leader
+        if hasattr(self, 'canvas') and self.canvas:
+            self._draw_grid()
 
     def _find_rescue_target(self, cell_id):
         """
@@ -684,6 +869,60 @@ class SimulationEnvironment:
         # No swap was made
         return False
 
+    def _enable_parallel_movement(self, moves):
+        """
+        Enable parallel movement for cells when connectivity is not required.
+        This allows cells to move simultaneously, including chain movements where
+        one cell moves to a position that another cell is leaving.
+
+        Args:
+            moves (dict): Dictionary mapping cell_id to next position
+
+        Returns:
+            dict: Modified moves dictionary with parallel movement enabled
+        """
+        if not moves:
+            return moves
+
+        # Create a copy of current positions
+        new_positions = self.cell_positions.copy()
+
+        # Track which positions will be vacated
+        vacated_positions = {}
+        for cell_id, next_pos in moves.items():
+            vacated_positions[self.cell_positions[cell_id]] = cell_id
+
+        # Process moves in order of cell ID for deterministic behavior
+        valid_moves = {}
+        chain_moves = {}
+
+        # First pass: identify chain moves (cell moving to a position that will be vacated)
+        for cell_id in sorted(moves.keys()):
+            next_pos = moves[cell_id]
+            current_pos = self.cell_positions[cell_id]
+
+            # Skip if the cell isn't moving
+            if next_pos == current_pos:
+                continue
+
+            # Check if the cell is moving to a position that will be vacated
+            if next_pos in vacated_positions and vacated_positions[next_pos] != cell_id:
+                # This is a chain move - store it for the second pass
+                chain_moves[cell_id] = next_pos
+            elif next_pos not in new_positions.values() or next_pos == current_pos:
+                # Position is empty or cell is not moving - move is valid
+                valid_moves[cell_id] = next_pos
+                new_positions[cell_id] = next_pos
+
+        # Second pass: process chain moves
+        for cell_id, next_pos in chain_moves.items():
+            # Check if the position is now available (vacated by another cell)
+            if next_pos not in new_positions.values():
+                valid_moves[cell_id] = next_pos
+                new_positions[cell_id] = next_pos
+
+        return valid_moves
+
     def _enforce_connectivity(self, moves):
         """
         Enforce connectivity constraint (snake-like movement).
@@ -710,10 +949,59 @@ class SimulationEnvironment:
             # If cells are not already connected, we can't enforce connectivity
             return moves
 
-        # Process moves in order of cell ID to ensure deterministic behavior
+        # Track which positions will be vacated
+        vacated_positions = {}
+        for cell_id, next_pos in moves.items():
+            vacated_positions[self.cell_positions[cell_id]] = cell_id
+
+        # Process moves in order of priority
         valid_moves = {}
-        for cell_id in sorted(moves.keys()):
+        chain_moves = {}
+
+        # If we have a leader, process its move first
+        if self.has_leader and self.leader_id in moves:
+            cell_id = self.leader_id
             next_pos = moves[cell_id]
+
+            # Temporarily apply this move
+            old_pos = new_positions[cell_id]
+            new_positions[cell_id] = next_pos
+
+            # Check if the move maintains connectivity
+            new_graph = self._build_connectivity_graph(new_positions)
+            if self._is_connected(new_graph):
+                # Move is valid, keep it
+                valid_moves[cell_id] = next_pos
+                print(f"Leader cell {cell_id} move from {old_pos} to {next_pos} allowed")
+            else:
+                # Move breaks connectivity, revert it
+                new_positions[cell_id] = old_pos
+                print(f"Leader cell {cell_id} move from {old_pos} to {next_pos} rejected - would break connectivity")
+
+                # If the leader is stuck and can't move, increment its stuck count
+                # This will trigger leader change in the next step if it happens repeatedly
+                if self.leader_id in self.cell_controllers:
+                    self.cell_controllers[self.leader_id].stuck_count += 1
+                    print(f"Leader cell {self.leader_id} stuck count increased to {self.cell_controllers[self.leader_id].stuck_count}")
+
+        # First pass: Process direct moves (not chain moves)
+        for cell_id in sorted(moves.keys()):
+            # Skip the leader as we've already processed it
+            if self.has_leader and cell_id == self.leader_id:
+                continue
+
+            next_pos = moves[cell_id]
+            current_pos = self.cell_positions[cell_id]
+
+            # Skip if the cell isn't moving
+            if next_pos == current_pos:
+                continue
+
+            # Check if this is a chain move (moving to a position that will be vacated)
+            if next_pos in vacated_positions and vacated_positions[next_pos] != cell_id:
+                # This is a chain move - store it for the second pass
+                chain_moves[cell_id] = next_pos
+                continue
 
             # Temporarily apply this move
             old_pos = new_positions[cell_id]
@@ -729,6 +1017,25 @@ class SimulationEnvironment:
                 new_positions[cell_id] = old_pos
                 # Print debug info
                 print(f"Cell {cell_id} move from {old_pos} to {next_pos} rejected - would break connectivity")
+
+        # Second pass: Process chain moves
+        for cell_id, next_pos in chain_moves.items():
+            # Check if the position is now available (vacated by another cell)
+            if next_pos not in new_positions.values():
+                # Temporarily apply this move
+                old_pos = new_positions[cell_id]
+                new_positions[cell_id] = next_pos
+
+                # Check if the move maintains connectivity
+                new_graph = self._build_connectivity_graph(new_positions)
+                if self._is_connected(new_graph):
+                    # Move is valid, keep it
+                    valid_moves[cell_id] = next_pos
+                    print(f"Chain move: Cell {cell_id} move from {old_pos} to {next_pos} allowed")
+                else:
+                    # Move breaks connectivity, revert it
+                    new_positions[cell_id] = old_pos
+                    print(f"Chain move: Cell {cell_id} move from {old_pos} to {next_pos} rejected - would break connectivity")
 
         if len(valid_moves) < len(moves):
             print(f"Connectivity enforced: {len(valid_moves)}/{len(moves)} moves allowed")
@@ -822,6 +1129,7 @@ class SimulationEnvironment:
         """
         Resolve conflicts where multiple cells want to move to the same position.
         Prioritizes cells moving toward center and those closest to their targets.
+        Enhanced to better handle parallel movement and prioritize filling the target shape.
 
         Args:
             moves (dict): Dictionary mapping cell_id to next position
@@ -852,21 +1160,74 @@ class SimulationEnvironment:
                     target_distance = abs(pos[0] - target[0]) + abs(pos[1] - target[1])
                     target_score = 1.0 / (target_distance + 1)
 
-                    # Factor 2: Is this move getting closer to the center? (higher is better)
+                    # Factor 2: HIGH PRIORITY - Distance to center (lower is better)
+                    # This is the key factor for inside-out filling
+                    target_center_distance = abs(target[0] - center_row) + abs(target[1] - center_col)
+                    # Use inside_out_priority to adjust the weight for inner targets
+                    # Higher inside_out_priority means stronger preference for inner targets
+                    inner_target_score = (1.0 + self.inside_out_priority * 2.0) / (target_center_distance + 1)
+
+                    # Factor 3: Is this move getting closer to the center? (higher is better)
                     current_center_dist = abs(current_pos[0] - center_row) + abs(current_pos[1] - center_col)
                     new_center_dist = abs(pos[0] - center_row) + abs(pos[1] - center_col)
                     center_improvement = current_center_dist - new_center_dist
+                    # More balanced score for moves toward center
                     center_score = 0.5 if center_improvement > 0 else 0
 
-                    # Factor 3: Is this move making progress toward target? (higher is better)
+                    # Factor 4: Is this move making progress toward target? (higher is better)
                     current_target_dist = abs(current_pos[0] - target[0]) + abs(current_pos[1] - target[1])
                     progress_score = 0.5 if target_distance < current_target_dist else 0
 
+                    # Factor 5: Is the cell already in the target shape? (lower priority if yes)
+                    in_target_shape = current_pos in self.target_shape
+                    target_shape_score = -0.5 if in_target_shape else 0
+
+                    # Factor 6: Is the cell stuck? (higher priority if yes)
+                    stuck_score = min(self.cell_controllers[cell_id].stuck_count * 0.05, 0.5)
+
+                    # Factor 7: Is the cell moving to a position in the target shape? (higher priority)
+                    moving_to_target = 0.5 if pos in self.target_shape else 0
+
+                    # Factor 8: HIGH PRIORITY - Is the cell moving to an inner position in the target shape?
+                    # This prioritizes filling from the inside out based on inside_out_priority
+                    if pos in self.target_shape:
+                        pos_center_dist = abs(pos[0] - center_row) + abs(pos[1] - center_col)
+                        # Use inside_out_priority to adjust the weight for inner positions
+                        # Higher inside_out_priority means stronger preference for inner positions
+                        inner_position_score = (1.0 + self.inside_out_priority * 1.5) / (pos_center_dist + 1)
+                    else:
+                        inner_position_score = 0
+
+                    # Calculate final score with user-adjustable priorities
+                    # Adjust progress score based on efficiency_priority
+                    # Higher efficiency_priority means more focus on taking fewer steps
+                    adjusted_progress_score = progress_score * self.efficiency_priority
+
+                    # Adjust connectivity factors based on connectivity_priority
+                    # Higher connectivity_priority means cells are more cooperative
+                    # This affects how much we penalize cells that are already in the target shape
+                    adjusted_target_shape_score = target_shape_score * (2.0 - self.connectivity_priority)
+
                     # Calculate final score (higher is better)
-                    cell_scores[cell_id] = target_score + center_score + progress_score
+                    cell_scores[cell_id] = (
+                        target_score +
+                        inner_target_score * self.inside_out_priority +  # Scale by inside_out_priority
+                        center_score * self.inside_out_priority +  # Scale by inside_out_priority
+                        adjusted_progress_score +  # Adjusted by efficiency_priority
+                        adjusted_target_shape_score +  # Adjusted by connectivity_priority
+                        stuck_score +
+                        moving_to_target +
+                        inner_position_score  # Already adjusted by inside_out_priority
+                    )
 
                 # Keep the cell with the highest score
                 best_cell_id = max(cell_scores.items(), key=lambda x: x[1])[0]
+
+                # Print debug info
+                print(f"Conflict at {pos}: Cell {best_cell_id} wins with score {cell_scores[best_cell_id]:.2f}")
+                for cell_id in cell_ids:
+                    if cell_id != best_cell_id:
+                        print(f"  Cell {cell_id} loses with score {cell_scores[cell_id]:.2f}")
 
                 # Remove all other cells from moves
                 for cell_id in cell_ids:
@@ -902,6 +1263,20 @@ class SimulationEnvironment:
         self.status_var = tk.StringVar(value="Initializing simulation...")
         status_label = ttk.Label(control_frame, textvariable=self.status_var)
         status_label.pack(side=tk.RIGHT)
+
+        # Add a frame for leader status
+        leader_frame = ttk.Frame(self.ui_window, padding=5)
+        leader_frame.pack(fill=tk.X)
+
+        # Add leader status label
+        if self.has_leader and self.keep_cells_connected:
+            leader_label = ttk.Label(leader_frame, text="Leader Cell:")
+            leader_label.pack(side=tk.LEFT)
+
+            # Create status label for leader changes
+            self.status_label = ttk.Label(leader_frame, text=f"Current leader: Cell {self.leader_id}",
+                                         foreground="purple", font=("Arial", 10, "bold"))
+            self.status_label.pack(side=tk.LEFT, padx=5)
 
         # Canvas for grid
         canvas_size = self.grid_size * self.cell_size
@@ -955,6 +1330,39 @@ class SimulationEnvironment:
             # Check if cell is at its target
             target = self.cell_targets[cell_id]
             color = self.colors['completed'] if (r, c) == target else self.colors['cell']
+
+            # If this is the leader cell, use a different color and add a crown
+            if self.has_leader and cell_id == self.leader_id:
+                # Use a more distinctive color for the leader
+                color = 'purple'  # Leader color
+
+                # Add a pulsing effect to make the leader more visible
+                # Use the current time to create a pulsing effect
+                import time
+                pulse = int(time.time() * 2) % 2  # Alternates between 0 and 1
+
+                # Make the leader cell slightly larger when pulsing
+                if pulse == 1:
+                    x1 -= 2
+                    y1 -= 2
+                    x2 += 2
+                    y2 += 2
+
+                # Draw a crown or marker to indicate leader
+                crown_points = [
+                    x1 + self.cell_size/2, y1 + 3,  # Top point
+                    x1 + self.cell_size - 3, y1 + 8,  # Right point
+                    x1 + 3, y1 + 8  # Left point
+                ]
+                self.canvas.create_polygon(
+                    crown_points, fill='gold', outline='black', width=2
+                )
+
+                # Add leader text
+                self.canvas.create_text(
+                    x1 + self.cell_size/2, y1 + self.cell_size/2,
+                    text="L", fill="white", font=("Arial", 12, "bold")
+                )
 
             # Draw cell
             self.canvas.create_oval(
@@ -1043,7 +1451,9 @@ if __name__ == "__main__":
     env = SimulationEnvironment(
         grid_size=grid_size,
         target_shape=target_shape,
-        obstacles=obstacles
+        obstacles=obstacles,
+        keep_cells_connected=True,  # Enable snake-like movement
+        has_leader=True  # Enable leader cell
     )
 
     # Initialize cells with default strategy
