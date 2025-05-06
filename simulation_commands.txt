@@ -1,0 +1,44 @@
+
+python run_agents.py --agent-type learned --shape cross --obstacle wall --grid-size 10 --max-steps 100
+
+python run_agents.py --agent-type learned --shape circle --obstacle border --grid-size 15 --max-steps 150
+
+python run_agents.py --agent-type learned --shape star --obstacle scattered --grid-size 20 --max-steps 200
+
+python run_agents.py --agent-type learned --shape h_shape --obstacle maze --grid-size 15 --max-steps 150
+
+python run_agents.py --agent-type learned --shape triangle --obstacle checkerboard --grid-size 18 --max-steps 180
+
+python run_agents.py --agent-type learned --shape l_shape --obstacle corners --grid-size 12 --max-steps 120
+
+python run_agents.py --agent-type learned --shape u_shape --obstacle spiral --grid-size 22 --max-steps 220
+
+python run_agents.py --agent-type learned --shape square --obstacle random --grid-size 16 --max-steps 160
+
+python run_agents.py --agent-type learned --shape cross --obstacle wall --grid-size 15 --max-steps 150 --snake
+
+python run_agents.py --agent-type learned --shape circle --obstacle border --grid-size 15 --max-steps 150 --snake --leader
+
+python run_agents.py --compare --shape cross --obstacle wall --grid-size 15 --max-steps 150
+
+python run_agents.py --compare --shape circle --obstacle border --grid-size 15 --max-steps 150
+
+python run_agents.py --compare --shape star --obstacle scattered --grid-size 20 --max-steps 200
+
+python run_agents.py --compare --shape cross --obstacle wall --grid-size 15 --max-steps 150 --snake
+
+python run_agents.py --compare --shape cross --obstacle wall --grid-size 15 --max-steps 150 --snake --leader
+
+python run_agents.py --compare --shape cross --obstacle wall --grid-size 15 --max-steps 150 --diagonal
+
+python run_agents.py --compare --shape cross --obstacle wall --grid-size 15 --max-steps 150 --snake --diagonal
+
+python run_agents.py --compare --shape cross --obstacle wall --grid-size 15 --max-steps 150 --snake --leader --diagonal
+
+python run_agents.py --agent-type learned --grid-size 15 --max-steps 150
+
+python run_agents.py --agent-type ga --shape star --obstacle maze --grid-size 20 --max-steps 200
+
+
+
+python run_agents.py --compare --shape circle --obstacle border --grid-size 15 --max-steps 150 --diagonal

@@ -1,0 +1,26 @@
+
+python train_ml_models.py --shape cross --obstacle wall --grid-size 10 --max-samples 5000
+
+python train_ml_models.py --shape circle --obstacle border --grid-size 15 --max-samples 8000
+
+python train_ml_models.py --shape star --obstacle scattered --grid-size 20 --max-samples 12000
+
+python train_ml_models.py --shape h_shape --obstacle maze --grid-size 15 --max-samples 10000
+
+python train_ml_models.py --shape triangle --obstacle checkerboard --grid-size 18 --max-samples 8000
+
+python train_ml_models.py --shape l_shape --obstacle corners --grid-size 12 --max-samples 6000
+
+python train_ml_models.py --shape u_shape --obstacle spiral --grid-size 22 --max-samples 15000
+
+python train_ml_models.py --shape square --obstacle random --grid-size 16 --max-samples 7500 --use-default-shapes
+
+python train_ml_models.py --shape cross --obstacle wall --grid-size 15 --max-samples 10000 --use-default-obstacles
+
+python train_ml_models.py --grid-size 20 --max-samples 20000
+
+python train_ml_models.py --shape cross --obstacle wall --grid-size 10 --max-samples 5000
+
+python train_ml_models.py --shape circle --obstacle maze --grid-size 15 --max-samples 10000
+
+python train_ml_models.py --shape star --obstacle scattered --grid-size 20 --max-samples 15000

@@ -10,6 +10,10 @@ from data_collector import DataCollector, GradientFieldDataCollector
 from ml_models import MovementPredictor, GradientFieldPredictor
 from gradient_field import GradientField
 from performance_analyzer import PerformanceAnalyzer
+from custom_shapes import (
+    create_custom_shape, create_custom_obstacles,
+    get_available_shapes, get_available_obstacles
+)
 
 def create_shapes_and_obstacles(grid_size):
     """
@@ -338,17 +342,66 @@ def test_models(grid_size, shapes, obstacles):
 
 def main():
     """Main function to train and test ML models"""
+    # Get available shapes and obstacles for help text
+    available_shapes = get_available_shapes()
+    available_obstacles = get_available_obstacles()
+
     parser = argparse.ArgumentParser(description='Train and test ML models for programmable matter')
     parser.add_argument('--grid-size', type=int, default=15, help='Size of the grid')
     parser.add_argument('--max-samples', type=int, default=10000, help='Maximum number of training samples')
     parser.add_argument('--skip-training', action='store_true', help='Skip model training')
     parser.add_argument('--skip-testing', action='store_true', help='Skip model testing')
+
+    # Add custom shape and obstacle options
+    parser.add_argument('--shape', type=str, help=f'Custom shape to use for training. Available shapes: {", ".join(available_shapes)}')
+    parser.add_argument('--obstacle', type=str, help=f'Custom obstacle configuration to use for training. Available obstacles: {", ".join(available_obstacles)}')
+    parser.add_argument('--use-default-shapes', action='store_true', help='Use default shapes in addition to custom shape')
+    parser.add_argument('--use-default-obstacles', action='store_true', help='Use default obstacles in addition to custom obstacles')
+
     args = parser.parse_args()
 
     try:
         # Create shapes and obstacles
         print("Creating shapes and obstacles...")
-        shapes, obstacles = create_shapes_and_obstacles(args.grid_size)
+
+        # Check if custom shape or obstacle is specified
+        if args.shape or args.obstacle:
+            shapes = []
+            obstacles = []
+
+            # Add custom shape if specified
+            if args.shape:
+                if args.shape in available_shapes:
+                    print(f"Using custom shape: {args.shape}")
+                    custom_shape = create_custom_shape(args.shape, args.grid_size)
+                    shapes.append(custom_shape)
+                else:
+                    print(f"Warning: Shape '{args.shape}' not found. Available shapes: {', '.join(available_shapes)}")
+
+            # Add custom obstacle if specified
+            if args.obstacle:
+                if args.obstacle in available_obstacles:
+                    print(f"Using custom obstacle configuration: {args.obstacle}")
+                    # Use the first shape (if available) to avoid overlap
+                    target_shape = shapes[0] if shapes else None
+                    custom_obstacles = create_custom_obstacles(args.obstacle, args.grid_size, target_shape)
+                    obstacles.append(custom_obstacles)
+                else:
+                    print(f"Warning: Obstacle configuration '{args.obstacle}' not found. Available obstacles: {', '.join(available_obstacles)}")
+
+            # Add default shapes and obstacles if requested
+            if args.use_default_shapes or not shapes:
+                print("Adding default shapes...")
+                default_shapes, _ = create_shapes_and_obstacles(args.grid_size)
+                shapes.extend(default_shapes)
+
+            if args.use_default_obstacles or not obstacles:
+                print("Adding default obstacles...")
+                _, default_obstacles = create_shapes_and_obstacles(args.grid_size)
+                obstacles.extend(default_obstacles)
+        else:
+            # Use default shapes and obstacles
+            shapes, obstacles = create_shapes_and_obstacles(args.grid_size)
 
         if not args.skip_training:
             # Load GA models

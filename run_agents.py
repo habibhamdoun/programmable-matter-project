@@ -7,8 +7,13 @@ from model_persistence import ModelPersistence
 from learned_agent import MLAgentFactory
 from visualization_tools import SimulationVisualizer
 from train_ml_models import create_shapes_and_obstacles
+from custom_shapes import (
+    create_custom_shape, create_custom_obstacles,
+    get_available_shapes, get_available_obstacles
+)
 
-def run_agent(agent_type, grid_size, target_shape, obstacles, model_path=None, max_steps=100, visualize=True):
+def run_agent(agent_type, grid_size, target_shape, obstacles, model_path=None, max_steps=100,
+           visualize=True, enable_diagonal=False, snake_mode=False, use_leader=False):
     """
     Run a simulation with a specific agent type.
 
@@ -20,6 +25,9 @@ def run_agent(agent_type, grid_size, target_shape, obstacles, model_path=None, m
         model_path (str): Path to the model file (for ML-based agents)
         max_steps (int): Maximum number of steps to simulate
         visualize (bool): Whether to visualize the simulation
+        enable_diagonal (bool): Whether to enable diagonal movement
+        snake_mode (bool): Whether to enable snake-like movement (cells remain connected)
+        use_leader (bool): Whether to use a leader cell (only works with snake_mode)
 
     Returns:
         tuple: (final_positions, steps_taken, simulation_history)
@@ -28,7 +36,9 @@ def run_agent(agent_type, grid_size, target_shape, obstacles, model_path=None, m
     sim_env = SimulationEnvironment(
         grid_size=grid_size,
         target_shape=target_shape,
-        obstacles=obstacles
+        obstacles=obstacles,
+        keep_cells_connected=snake_mode,
+        has_leader=use_leader and snake_mode  # Leader only works when snake mode is enabled
     )
 
     # Get default strategy
@@ -37,7 +47,7 @@ def run_agent(agent_type, grid_size, target_shape, obstacles, model_path=None, m
         'obstacle_weight': 1.0,
         'efficiency_weight': 1.0,
         'exploration_threshold': 0.2,
-        'diagonal_preference': 1.0,
+        'diagonal_preference': 1.5 if enable_diagonal else 1.0,  # Set to 1.5 to enable diagonal movement
         'patience': 5,
         'cooperation': 0.5,
         'risk_tolerance': 0.3
@@ -105,7 +115,7 @@ def run_agent(agent_type, grid_size, target_shape, obstacles, model_path=None, m
         record_step()
 
         # Visualize if requested
-        if visualize:
+        if visualize and hasattr(sim_env, 'ui_window') and sim_env.ui_window is not None:
             sim_env._update_visualization()
             sim_env.ui_window.update()
 
@@ -115,7 +125,8 @@ def run_agent(agent_type, grid_size, target_shape, obstacles, model_path=None, m
 
     return final_positions, steps_taken, simulation_history
 
-def compare_agents(grid_size, target_shape, obstacles, max_steps=100):
+def compare_agents(grid_size, target_shape, obstacles, max_steps=100, enable_diagonal=False,
+                snake_mode=False, use_leader=False):
     """
     Run simulations with different agent types and compare their performance.
 
@@ -124,6 +135,9 @@ def compare_agents(grid_size, target_shape, obstacles, max_steps=100):
         target_shape (list): List of target positions
         obstacles (set): Set of obstacle positions
         max_steps (int): Maximum number of steps to simulate
+        enable_diagonal (bool): Whether to enable diagonal movement
+        snake_mode (bool): Whether to enable snake-like movement (cells remain connected)
+        use_leader (bool): Whether to use a leader cell (only works with snake_mode)
 
     Returns:
         dict: Dictionary mapping agent names to simulation histories
@@ -162,7 +176,8 @@ def compare_agents(grid_size, target_shape, obstacles, max_steps=100):
         # Run simulation
         _, steps_taken, history = run_agent(
             agent_type, grid_size, target_shape, obstacles,
-            model_path, max_steps, visualize=False
+            model_path, max_steps, visualize=False, enable_diagonal=enable_diagonal,
+            snake_mode=snake_mode, use_leader=use_leader
         )
 
         # Store history
@@ -174,6 +189,10 @@ def compare_agents(grid_size, target_shape, obstacles, max_steps=100):
 
 def main():
     """Main function to run and visualize agents"""
+    # Get available shapes and obstacles for help text
+    available_shapes = get_available_shapes()
+    available_obstacles = get_available_obstacles()
+
     parser = argparse.ArgumentParser(description='Run and visualize different agent types')
     parser.add_argument('--agent-type', type=str, default='ga',
                         choices=['ga', 'learned', 'expectimax', 'gradient', 'ca'],
@@ -182,14 +201,52 @@ def main():
     parser.add_argument('--max-steps', type=int, default=100, help='Maximum number of steps')
     parser.add_argument('--compare', action='store_true', help='Compare all agent types')
     parser.add_argument('--no-visualize', action='store_true', help='Disable visualization')
+    parser.add_argument('--diagonal', action='store_true', help='Enable diagonal movement for all agents')
+    parser.add_argument('--snake', action='store_true', help='Enable snake-like movement (cells remain connected)')
+    parser.add_argument('--leader', action='store_true', help='Use a leader cell (only works with --snake)')
+
+    # Add custom shape and obstacle options
+    parser.add_argument('--shape', type=str, help=f'Custom shape to use. Available shapes: {", ".join(available_shapes)}')
+    parser.add_argument('--obstacle', type=str, help=f'Custom obstacle configuration to use. Available obstacles: {", ".join(available_obstacles)}')
+
     args = parser.parse_args()
 
     # Create shapes and obstacles
-    shapes, obstacles = create_shapes_and_obstacles(args.grid_size)
+    if args.shape or args.obstacle:
+        # Use custom shape if specified
+        if args.shape:
+            if args.shape in available_shapes:
+                print(f"Using custom shape: {args.shape}")
+                target_shape = create_custom_shape(args.shape, args.grid_size)
+            else:
+                print(f"Warning: Shape '{args.shape}' not found. Available shapes: {', '.join(available_shapes)}")
+                print("Using default square shape instead.")
+                shapes, _ = create_shapes_and_obstacles(args.grid_size)
+                target_shape = shapes[0]
+        else:
+            # Use default shape
+            shapes, _ = create_shapes_and_obstacles(args.grid_size)
+            target_shape = shapes[0]
 
-    # Use the first shape and obstacle configuration
-    target_shape = shapes[0]
-    obstacle_set = obstacles[0]
+        # Use custom obstacles if specified
+        if args.obstacle:
+            if args.obstacle in available_obstacles:
+                print(f"Using custom obstacle configuration: {args.obstacle}")
+                obstacle_set = create_custom_obstacles(args.obstacle, args.grid_size, target_shape)
+            else:
+                print(f"Warning: Obstacle configuration '{args.obstacle}' not found. Available obstacles: {', '.join(available_obstacles)}")
+                print("Using default random obstacles instead.")
+                _, obstacles = create_shapes_and_obstacles(args.grid_size)
+                obstacle_set = obstacles[0]
+        else:
+            # Use default obstacles
+            _, obstacles = create_shapes_and_obstacles(args.grid_size)
+            obstacle_set = obstacles[0]
+    else:
+        # Use default shapes and obstacles
+        shapes, obstacles = create_shapes_and_obstacles(args.grid_size)
+        target_shape = shapes[0]
+        obstacle_set = obstacles[0]
 
     # Double-check that no obstacles are inside the target shape
     target_shape_set = set(target_shape)
@@ -233,11 +290,18 @@ def main():
     obstacle_set = {pos for pos in obstacle_set if pos not in all_shape_positions}
 
     print(f"Using target shape with {len(target_shape)} positions and {len(obstacle_set)} obstacles")
+    if args.diagonal:
+        print("Diagonal movement is enabled - cells can move in 8 directions")
+    if args.snake:
+        print("Snake mode is enabled - cells will remain connected during movement")
+        if args.leader:
+            print("Leader cell is enabled - one cell will lead the movement of the group")
 
     if args.compare:
         # Compare all agent types
         simulation_histories = compare_agents(
-            args.grid_size, target_shape, obstacle_set, args.max_steps
+            args.grid_size, target_shape, obstacle_set, args.max_steps,
+            enable_diagonal=args.diagonal, snake_mode=args.snake, use_leader=args.leader
         )
 
         # Visualize comparison
@@ -259,7 +323,8 @@ def main():
         # Run a single agent type
         _, steps_taken, history = run_agent(
             args.agent_type, args.grid_size, target_shape, obstacle_set,
-            None, args.max_steps, visualize=not args.no_visualize
+            None, args.max_steps, visualize=not args.no_visualize,
+            enable_diagonal=args.diagonal, snake_mode=args.snake, use_leader=args.leader
         )
 
         print(f"Simulation completed in {steps_taken} steps")
