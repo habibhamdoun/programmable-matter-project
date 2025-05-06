@@ -13,6 +13,7 @@ from individual import Individual
 from cell_controller import CellController
 from model_persistence import ModelPersistence
 
+
 class EvolutionaryApp:
     """
     Main application for evolutionary training of cell movement strategies.
@@ -58,68 +59,90 @@ class EvolutionaryApp:
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Left panel (controls)
-        left_panel = ttk.LabelFrame(main_frame, text="Training Controls", padding=10)
+        left_panel = ttk.LabelFrame(
+            main_frame, text="Training Controls", padding=10)
         left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
 
         # Grid parameters
-        grid_frame = ttk.LabelFrame(left_panel, text="Grid Parameters", padding=10)
+        grid_frame = ttk.LabelFrame(
+            left_panel, text="Grid Parameters", padding=10)
         grid_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(grid_frame, text="Grid Size:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        ttk.Label(grid_frame, text="Grid Size:").grid(
+            row=0, column=0, sticky=tk.W, pady=2)
         self.grid_size_var = tk.IntVar(value=self.grid_size)
-        ttk.Spinbox(grid_frame, from_=10, to=30, textvariable=self.grid_size_var, width=5).grid(row=0, column=1, sticky=tk.W, pady=2)
+        ttk.Spinbox(grid_frame, from_=10, to=30, textvariable=self.grid_size_var, width=5).grid(
+            row=0, column=1, sticky=tk.W, pady=2)
 
-        ttk.Label(grid_frame, text="Number of Cells:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        ttk.Label(grid_frame, text="Number of Cells:").grid(
+            row=1, column=0, sticky=tk.W, pady=2)
         self.num_cells_var = tk.IntVar(value=self.num_cells)
-        ttk.Spinbox(grid_frame, from_=5, to=50, textvariable=self.num_cells_var, width=5).grid(row=1, column=1, sticky=tk.W, pady=2)
+        ttk.Spinbox(grid_frame, from_=5, to=50, textvariable=self.num_cells_var, width=5).grid(
+            row=1, column=1, sticky=tk.W, pady=2)
 
-        ttk.Label(grid_frame, text="Number of Obstacles:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        ttk.Label(grid_frame, text="Number of Obstacles:").grid(
+            row=2, column=0, sticky=tk.W, pady=2)
         self.num_obstacles_var = tk.IntVar(value=self.num_obstacles)
-        ttk.Spinbox(grid_frame, from_=0, to=100, textvariable=self.num_obstacles_var, width=5).grid(row=2, column=1, sticky=tk.W, pady=2)
+        ttk.Spinbox(grid_frame, from_=0, to=100, textvariable=self.num_obstacles_var, width=5).grid(
+            row=2, column=1, sticky=tk.W, pady=2)
 
         # Training parameters
-        train_frame = ttk.LabelFrame(left_panel, text="Training Parameters", padding=10)
+        train_frame = ttk.LabelFrame(
+            left_panel, text="Training Parameters", padding=10)
         train_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(train_frame, text="Population Size:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        ttk.Label(train_frame, text="Population Size:").grid(
+            row=0, column=0, sticky=tk.W, pady=2)
         self.population_size_var = tk.IntVar(value=self.population_size)
-        ttk.Spinbox(train_frame, from_=10, to=200, textvariable=self.population_size_var, width=5).grid(row=0, column=1, sticky=tk.W, pady=2)
+        ttk.Spinbox(train_frame, from_=10, to=200, textvariable=self.population_size_var, width=5).grid(
+            row=0, column=1, sticky=tk.W, pady=2)
 
-        ttk.Label(train_frame, text="Max Generations:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        ttk.Label(train_frame, text="Max Generations:").grid(
+            row=1, column=0, sticky=tk.W, pady=2)
         self.max_generations_var = tk.IntVar(value=self.max_generations)
-        ttk.Spinbox(train_frame, from_=10, to=500, textvariable=self.max_generations_var, width=5).grid(row=1, column=1, sticky=tk.W, pady=2)
+        ttk.Spinbox(train_frame, from_=10, to=500, textvariable=self.max_generations_var, width=5).grid(
+            row=1, column=1, sticky=tk.W, pady=2)
 
-        ttk.Label(train_frame, text="Mutation Rate:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        ttk.Label(train_frame, text="Mutation Rate:").grid(
+            row=2, column=0, sticky=tk.W, pady=2)
         self.mutation_rate_var = tk.DoubleVar(value=self.mutation_rate)
-        ttk.Spinbox(train_frame, from_=0.01, to=0.5, increment=0.01, textvariable=self.mutation_rate_var, width=5).grid(row=2, column=1, sticky=tk.W, pady=2)
+        ttk.Spinbox(train_frame, from_=0.01, to=0.5, increment=0.01,
+                    textvariable=self.mutation_rate_var, width=5).grid(row=2, column=1, sticky=tk.W, pady=2)
 
         # Movement constraints
-        ttk.Label(train_frame, text="Movement Constraints:").grid(row=3, column=0, sticky=tk.W, pady=2)
+        ttk.Label(train_frame, text="Movement Constraints:").grid(
+            row=3, column=0, sticky=tk.W, pady=2)
         self.main_keep_connected_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(train_frame, text="Keep cells connected",
-                       variable=self.main_keep_connected_var).grid(row=3, column=1, sticky=tk.W, pady=2)
+                        variable=self.main_keep_connected_var).grid(row=3, column=1, sticky=tk.W, pady=2)
 
         # Action buttons
         button_frame = ttk.Frame(left_panel)
         button_frame.pack(fill=tk.X, pady=10)
 
-        self.initialize_btn = ttk.Button(button_frame, text="Initialize", command=self.initialize)
+        self.initialize_btn = ttk.Button(
+            button_frame, text="Initialize", command=self.initialize)
         self.initialize_btn.pack(fill=tk.X, pady=2)
 
-        self.train_btn = ttk.Button(button_frame, text="Train", command=self.train, state=tk.DISABLED)
+        self.train_btn = ttk.Button(
+            button_frame, text="Train", command=self.train, state=tk.DISABLED)
         self.train_btn.pack(fill=tk.X, pady=2)
 
-        self.simulate_btn = ttk.Button(button_frame, text="Simulate Best", command=self.simulate_best, state=tk.DISABLED)
+        self.simulate_btn = ttk.Button(
+            button_frame, text="Simulate Best", command=self.simulate_best, state=tk.DISABLED)
         self.simulate_btn.pack(fill=tk.X, pady=2)
 
-        self.reset_btn = ttk.Button(button_frame, text="Reset", command=self.reset)
+        self.reset_btn = ttk.Button(
+            button_frame, text="Reset", command=self.reset)
         self.reset_btn.pack(fill=tk.X, pady=2)
 
         # Add save/load buttons
-        self.save_btn = ttk.Button(button_frame, text="Save Model", command=self.save_model, state=tk.DISABLED)
+        self.save_btn = ttk.Button(
+            button_frame, text="Save Model", command=self.save_model, state=tk.DISABLED)
         self.save_btn.pack(fill=tk.X, pady=2)
 
-        self.load_btn = ttk.Button(button_frame, text="Load Model", command=self.load_model)
+        self.load_btn = ttk.Button(
+            button_frame, text="Load Model", command=self.load_model)
         self.load_btn.pack(fill=tk.X, pady=2)
 
         # Status
@@ -127,12 +150,14 @@ class EvolutionaryApp:
         status_frame.pack(fill=tk.X, pady=(10, 0))
 
         self.status_var = tk.StringVar(value="Ready")
-        status_label = ttk.Label(status_frame, textvariable=self.status_var, wraplength=200)
+        status_label = ttk.Label(
+            status_frame, textvariable=self.status_var, wraplength=200)
         status_label.pack(fill=tk.X)
 
         # Progress bar
         self.progress_var = tk.DoubleVar(value=0)
-        progress_bar = ttk.Progressbar(status_frame, variable=self.progress_var, length=200)
+        progress_bar = ttk.Progressbar(
+            status_frame, variable=self.progress_var, length=200)
         progress_bar.pack(fill=tk.X, pady=(5, 0))
 
         # Right panel (visualization)
@@ -187,60 +212,68 @@ class EvolutionaryApp:
         preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
         # Shape selection
-        shape_frame = ttk.LabelFrame(controls_frame, text="Target Shape", padding=10)
+        shape_frame = ttk.LabelFrame(
+            controls_frame, text="Target Shape", padding=10)
         shape_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(shape_frame, text="Shape Type:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        ttk.Label(shape_frame, text="Shape Type:").grid(
+            row=0, column=0, sticky=tk.W, pady=2)
         self.shape_type_var = tk.StringVar(value="Rectangle")
         shape_combo = ttk.Combobox(shape_frame, textvariable=self.shape_type_var,
-                                  values=["Rectangle", "Circle", "Cross", "Heart", "Arrow", "Custom"])
+                                   values=["Rectangle", "Circle", "Cross", "Heart", "Arrow", "Custom"])
         shape_combo.grid(row=0, column=1, sticky=tk.W, pady=2)
         shape_combo.bind("<<ComboboxSelected>>", self._on_shape_type_changed)
 
         # Obstacle pattern
-        obstacle_frame = ttk.LabelFrame(controls_frame, text="Obstacles", padding=10)
+        obstacle_frame = ttk.LabelFrame(
+            controls_frame, text="Obstacles", padding=10)
         obstacle_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(obstacle_frame, text="Obstacle Pattern:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        ttk.Label(obstacle_frame, text="Obstacle Pattern:").grid(
+            row=0, column=0, sticky=tk.W, pady=2)
         self.obstacle_pattern_var = tk.StringVar(value="Random")
         obstacle_combo = ttk.Combobox(obstacle_frame, textvariable=self.obstacle_pattern_var,
-                                     values=["Random", "Border", "Maze", "Scattered", "Spiral", "Wall with Gap", "Horizontal Wall Above", "Custom"])
+                                      values=["Random", "Border", "Maze", "Scattered", "Spiral", "Wall with Gap", "Horizontal Wall Above", "Custom"])
         obstacle_combo.grid(row=0, column=1, sticky=tk.W, pady=2)
-        obstacle_combo.bind("<<ComboboxSelected>>", self._on_obstacle_pattern_changed)
+        obstacle_combo.bind("<<ComboboxSelected>>",
+                            self._on_obstacle_pattern_changed)
 
         # Custom editing mode
-        self.edit_mode_frame = ttk.LabelFrame(controls_frame, text="Edit Mode", padding=10)
+        self.edit_mode_frame = ttk.LabelFrame(
+            controls_frame, text="Edit Mode", padding=10)
         self.edit_mode_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.edit_mode_var = tk.StringVar(value="None")
         ttk.Radiobutton(self.edit_mode_frame, text="Edit Target Shape",
-                       variable=self.edit_mode_var, value="Shape").pack(anchor=tk.W)
+                        variable=self.edit_mode_var, value="Shape").pack(anchor=tk.W)
         ttk.Radiobutton(self.edit_mode_frame, text="Edit Obstacles",
-                       variable=self.edit_mode_var, value="Obstacles").pack(anchor=tk.W)
+                        variable=self.edit_mode_var, value="Obstacles").pack(anchor=tk.W)
         ttk.Radiobutton(self.edit_mode_frame, text="Set Starting Positions",
-                       variable=self.edit_mode_var, value="Start").pack(anchor=tk.W)
+                        variable=self.edit_mode_var, value="Start").pack(anchor=tk.W)
         ttk.Radiobutton(self.edit_mode_frame, text="View Only",
-                       variable=self.edit_mode_var, value="None").pack(anchor=tk.W)
+                        variable=self.edit_mode_var, value="None").pack(anchor=tk.W)
 
         # Instructions for custom editing
         instructions = "Click on cells to add/remove them.\nFor starting positions, click to place cells in order."
-        ttk.Label(self.edit_mode_frame, text=instructions, wraplength=200).pack(pady=(5, 0))
+        ttk.Label(self.edit_mode_frame, text=instructions,
+                  wraplength=200).pack(pady=(5, 0))
 
         # Clear button for custom shapes/obstacles/starting positions
         clear_frame = ttk.Frame(self.edit_mode_frame)
         clear_frame.pack(fill=tk.X, pady=(5, 0))
 
         ttk.Button(clear_frame, text="Clear Shape",
-                  command=self._clear_custom_shape).pack(side=tk.LEFT, padx=2)
+                   command=self._clear_custom_shape).pack(side=tk.LEFT, padx=2)
         ttk.Button(clear_frame, text="Clear Obstacles",
-                  command=self._clear_custom_obstacles).pack(side=tk.LEFT, padx=2)
+                   command=self._clear_custom_obstacles).pack(side=tk.LEFT, padx=2)
         ttk.Button(clear_frame, text="Clear Start Positions",
-                  command=self._clear_start_positions).pack(side=tk.LEFT, padx=2)
+                   command=self._clear_start_positions).pack(side=tk.LEFT, padx=2)
 
         # Initially hide the edit mode frame
         self.edit_mode_frame.pack_forget()
 
-        ttk.Label(obstacle_frame, text="Number of Obstacles:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        ttk.Label(obstacle_frame, text="Number of Obstacles:").grid(
+            row=1, column=0, sticky=tk.W, pady=2)
         self.custom_obstacles_var = tk.IntVar(value=15)
         ttk.Spinbox(obstacle_frame, from_=0, to=100, textvariable=self.custom_obstacles_var, width=5).grid(
             row=1, column=1, sticky=tk.W, pady=2)
@@ -250,19 +283,20 @@ class EvolutionaryApp:
         button_frame.pack(fill=tk.X, pady=10)
 
         self.update_preview_btn = ttk.Button(button_frame, text="Update Preview",
-                                           command=self._update_custom_preview)
+                                             command=self._update_custom_preview)
         self.update_preview_btn.pack(fill=tk.X, pady=2)
 
         self.test_model_btn = ttk.Button(button_frame, text="Test Loaded Model",
-                                       command=self._test_model_on_custom_shape, state=tk.DISABLED)
+                                         command=self._test_model_on_custom_shape, state=tk.DISABLED)
         self.test_model_btn.pack(fill=tk.X, pady=2)
 
         self.train_custom_btn = ttk.Button(button_frame, text="Train on Custom Shape",
-                                         command=self._train_on_custom_shape)
+                                           command=self._train_on_custom_shape)
         self.train_custom_btn.pack(fill=tk.X, pady=2)
 
         # Training options frame
-        training_options_frame = ttk.LabelFrame(controls_frame, text="Training Options", padding=10)
+        training_options_frame = ttk.LabelFrame(
+            controls_frame, text="Training Options", padding=10)
         training_options_frame.pack(fill=tk.X, pady=(0, 10))
 
         # Starting positions option
@@ -271,7 +305,7 @@ class EvolutionaryApp:
 
         self.use_custom_start_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(start_pos_frame, text="Use custom starting positions",
-                       variable=self.use_custom_start_var).pack(anchor=tk.W)
+                        variable=self.use_custom_start_var).pack(anchor=tk.W)
 
         # Movement constraints option
         movement_frame = ttk.Frame(training_options_frame)
@@ -279,10 +313,11 @@ class EvolutionaryApp:
 
         self.keep_connected_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(movement_frame, text="Keep cells connected (snake-like movement)",
-                       variable=self.keep_connected_var).pack(anchor=tk.W)
+                        variable=self.keep_connected_var).pack(anchor=tk.W)
 
         # Training parameters
-        params_frame = ttk.LabelFrame(training_options_frame, text="Training Parameters", padding=5)
+        params_frame = ttk.LabelFrame(
+            training_options_frame, text="Training Parameters", padding=5)
         params_frame.pack(fill=tk.X, pady=(0, 5))
 
         # Generations
@@ -291,7 +326,7 @@ class EvolutionaryApp:
         ttk.Label(gen_frame, text="Generations:").pack(side=tk.LEFT)
         self.custom_generations_var = tk.IntVar(value=50)
         ttk.Spinbox(gen_frame, from_=10, to=500, width=5,
-                   textvariable=self.custom_generations_var).pack(side=tk.LEFT, padx=5)
+                    textvariable=self.custom_generations_var).pack(side=tk.LEFT, padx=5)
 
         # Population size
         pop_frame = ttk.Frame(params_frame)
@@ -299,7 +334,7 @@ class EvolutionaryApp:
         ttk.Label(pop_frame, text="Population Size:").pack(side=tk.LEFT)
         self.custom_population_var = tk.IntVar(value=50)
         ttk.Spinbox(pop_frame, from_=10, to=200, width=5,
-                   textvariable=self.custom_population_var).pack(side=tk.LEFT, padx=5)
+                    textvariable=self.custom_population_var).pack(side=tk.LEFT, padx=5)
 
         # Mutation rate
         mut_frame = ttk.Frame(params_frame)
@@ -307,10 +342,11 @@ class EvolutionaryApp:
         ttk.Label(mut_frame, text="Mutation Rate:").pack(side=tk.LEFT)
         self.custom_mutation_var = tk.DoubleVar(value=0.05)
         ttk.Spinbox(mut_frame, from_=0.01, to=0.5, increment=0.01, width=5,
-                   textvariable=self.custom_mutation_var).pack(side=tk.LEFT, padx=5)
+                    textvariable=self.custom_mutation_var).pack(side=tk.LEFT, padx=5)
 
         # Randomization options
-        random_frame = ttk.LabelFrame(training_options_frame, text="Randomization", padding=5)
+        random_frame = ttk.LabelFrame(
+            training_options_frame, text="Randomization", padding=5)
         random_frame.pack(fill=tk.X, pady=(0, 5))
 
         # Randomize shapes during training
@@ -319,11 +355,11 @@ class EvolutionaryApp:
 
         self.randomize_shapes_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(shape_frame, text="Randomize shapes every",
-                       variable=self.randomize_shapes_var).pack(side=tk.LEFT)
+                        variable=self.randomize_shapes_var).pack(side=tk.LEFT)
 
         self.shape_interval_var = tk.IntVar(value=20)
         ttk.Spinbox(shape_frame, from_=1, to=100, width=5,
-                   textvariable=self.shape_interval_var).pack(side=tk.LEFT, padx=2)
+                    textvariable=self.shape_interval_var).pack(side=tk.LEFT, padx=2)
 
         ttk.Label(shape_frame, text="generations").pack(side=tk.LEFT)
 
@@ -331,38 +367,40 @@ class EvolutionaryApp:
         shape_types_frame = ttk.Frame(random_frame)
         shape_types_frame.pack(fill=tk.X, pady=2)
 
-        ttk.Label(shape_types_frame, text="Include shapes:").pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(shape_types_frame, text="Include shapes:").pack(
+            side=tk.LEFT, padx=(0, 5))
 
         # Create checkbuttons for each shape type
         self.include_rectangle_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(shape_types_frame, text="Rectangle",
-                       variable=self.include_rectangle_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_rectangle_var).pack(side=tk.LEFT, padx=2)
 
         self.include_circle_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(shape_types_frame, text="Circle",
-                       variable=self.include_circle_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_circle_var).pack(side=tk.LEFT, padx=2)
 
         self.include_cross_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(shape_types_frame, text="Cross",
-                       variable=self.include_cross_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_cross_var).pack(side=tk.LEFT, padx=2)
 
         # Second row for more shapes
         shape_types_frame2 = ttk.Frame(random_frame)
         shape_types_frame2.pack(fill=tk.X, pady=2)
 
-        ttk.Label(shape_types_frame2, text="").pack(side=tk.LEFT, padx=(0, 75))  # Spacer for alignment
+        ttk.Label(shape_types_frame2, text="").pack(
+            side=tk.LEFT, padx=(0, 75))  # Spacer for alignment
 
         self.include_heart_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(shape_types_frame2, text="Heart",
-                       variable=self.include_heart_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_heart_var).pack(side=tk.LEFT, padx=2)
 
         self.include_arrow_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(shape_types_frame2, text="Arrow",
-                       variable=self.include_arrow_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_arrow_var).pack(side=tk.LEFT, padx=2)
 
         self.include_custom_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(shape_types_frame2, text="Custom",
-                       variable=self.include_custom_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_custom_var).pack(side=tk.LEFT, padx=2)
 
         # Randomize obstacles during training
         obstacle_frame = ttk.Frame(random_frame)
@@ -370,11 +408,11 @@ class EvolutionaryApp:
 
         self.randomize_obstacles_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(obstacle_frame, text="Randomize obstacles every",
-                       variable=self.randomize_obstacles_var).pack(side=tk.LEFT)
+                        variable=self.randomize_obstacles_var).pack(side=tk.LEFT)
 
         self.obstacle_interval_var = tk.IntVar(value=10)
         ttk.Spinbox(obstacle_frame, from_=1, to=100, width=5,
-                   textvariable=self.obstacle_interval_var).pack(side=tk.LEFT, padx=2)
+                    textvariable=self.obstacle_interval_var).pack(side=tk.LEFT, padx=2)
 
         ttk.Label(obstacle_frame, text="generations").pack(side=tk.LEFT)
 
@@ -382,38 +420,40 @@ class EvolutionaryApp:
         obstacle_types_frame = ttk.Frame(random_frame)
         obstacle_types_frame.pack(fill=tk.X, pady=2)
 
-        ttk.Label(obstacle_types_frame, text="Include obstacles:").pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(obstacle_types_frame, text="Include obstacles:").pack(
+            side=tk.LEFT, padx=(0, 5))
 
         # Create checkbuttons for each obstacle pattern
         self.include_random_obs_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(obstacle_types_frame, text="Random",
-                       variable=self.include_random_obs_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_random_obs_var).pack(side=tk.LEFT, padx=2)
 
         self.include_border_obs_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(obstacle_types_frame, text="Border",
-                       variable=self.include_border_obs_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_border_obs_var).pack(side=tk.LEFT, padx=2)
 
         self.include_maze_obs_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(obstacle_types_frame, text="Maze",
-                       variable=self.include_maze_obs_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_maze_obs_var).pack(side=tk.LEFT, padx=2)
 
         # Second row for more obstacle patterns
         obstacle_types_frame2 = ttk.Frame(random_frame)
         obstacle_types_frame2.pack(fill=tk.X, pady=2)
 
-        ttk.Label(obstacle_types_frame2, text="").pack(side=tk.LEFT, padx=(0, 75))  # Spacer for alignment
+        ttk.Label(obstacle_types_frame2, text="").pack(
+            side=tk.LEFT, padx=(0, 75))  # Spacer for alignment
 
         self.include_scattered_obs_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(obstacle_types_frame2, text="Scattered",
-                       variable=self.include_scattered_obs_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_scattered_obs_var).pack(side=tk.LEFT, padx=2)
 
         self.include_wall_gap_obs_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(obstacle_types_frame2, text="Wall with Gap",
-                       variable=self.include_wall_gap_obs_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_wall_gap_obs_var).pack(side=tk.LEFT, padx=2)
 
         self.include_custom_obs_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(obstacle_types_frame2, text="Custom",
-                       variable=self.include_custom_obs_var).pack(side=tk.LEFT, padx=2)
+                        variable=self.include_custom_obs_var).pack(side=tk.LEFT, padx=2)
 
         # Preview canvas
         self.preview_canvas = tk.Canvas(preview_frame, bg="white")
@@ -491,7 +531,8 @@ class EvolutionaryApp:
         for r, c in self.target_shape:
             x1, y1 = c * cell_size, r * cell_size
             x2, y2 = x1 + cell_size, y1 + cell_size
-            self.grid_canvas.create_rectangle(x1, y1, x2, y2, fill="lightgreen")
+            self.grid_canvas.create_rectangle(
+                x1, y1, x2, y2, fill="lightgreen")
 
         # Draw cells if simulation environment exists
         if self.simulation_env:
@@ -565,7 +606,8 @@ class EvolutionaryApp:
         # Set connectivity constraint if enabled
         if hasattr(self, 'main_keep_connected_var'):
             self.simulation_env.keep_cells_connected = self.main_keep_connected_var.get()
-            print(f"Main tab - Keep cells connected: {self.simulation_env.keep_cells_connected}")
+            print(
+                f"Main tab - Keep cells connected: {self.simulation_env.keep_cells_connected}")
 
         # Initialize cells with default strategy
         self.simulation_env.initialize_cells()
@@ -602,7 +644,8 @@ class EvolutionaryApp:
     def _train_on_custom_shape(self):
         """Train the model on the custom shape and obstacles"""
         if not self.custom_target_shape:
-            messagebox.showerror("Error", "Please create a custom shape first.")
+            messagebox.showerror(
+                "Error", "Please create a custom shape first.")
             return
 
         # Initialize if not already done
@@ -645,7 +688,8 @@ class EvolutionaryApp:
         if hasattr(self, 'custom_mutation_var'):
             mutation_rate = self.custom_mutation_var.get()
 
-        print(f"Training with: Population={population_size}, Generations={max_generations}, Mutation Rate={mutation_rate}")
+        print(
+            f"Training with: Population={population_size}, Generations={max_generations}, Mutation Rate={mutation_rate}")
 
         # Check if we already have a trainer with a population
         if self.trainer and hasattr(self.trainer, 'population') and self.best_individual:
@@ -658,7 +702,8 @@ class EvolutionaryApp:
             if hasattr(self, 'use_custom_start_var') and self.use_custom_start_var.get():
                 if hasattr(self, 'custom_start_positions') and self.custom_start_positions:
                     start_positions = self.custom_start_positions
-                    print(f"Using {len(start_positions)} custom starting positions for training")
+                    print(
+                        f"Using {len(start_positions)} custom starting positions for training")
 
             # Create a new trainer with the custom shape, obstacles, and training parameters
             self.trainer = EvolutionaryTrainer(
@@ -689,13 +734,17 @@ class EvolutionaryApp:
                         self.trainer.avg_fitness_history = self.avg_fitness_history.copy()
                     else:
                         # Initialize with existing best fitness
-                        self.trainer.best_fitness_history = [existing_best.fitness]
-                        self.trainer.avg_fitness_history = [existing_best.fitness]
+                        self.trainer.best_fitness_history = [
+                            existing_best.fitness]
+                        self.trainer.avg_fitness_history = [
+                            existing_best.fitness]
             else:
                 # If population size changed, create a new population but include the best individual
-                print(f"Population size changed from {len(existing_population)} to {population_size}, creating new population with best individual")
+                print(
+                    f"Population size changed from {len(existing_population)} to {population_size}, creating new population with best individual")
                 # Create a new population
-                self.trainer.population = [Individual(genome_size=8) for _ in range(population_size - 1)]
+                self.trainer.population = [Individual(
+                    genome_size=8) for _ in range(population_size - 1)]
                 # Add the best individual
                 self.trainer.population.append(existing_best)
                 # Reset training history
@@ -707,7 +756,8 @@ class EvolutionaryApp:
             if hasattr(self, 'use_custom_start_var') and self.use_custom_start_var.get():
                 if hasattr(self, 'custom_start_positions') and self.custom_start_positions:
                     start_positions = self.custom_start_positions
-                    print(f"Using {len(start_positions)} custom starting positions for training")
+                    print(
+                        f"Using {len(start_positions)} custom starting positions for training")
 
             # Create a new trainer with the custom shape, obstacles, and training parameters
             self.trainer = EvolutionaryTrainer(
@@ -752,7 +802,8 @@ class EvolutionaryApp:
 
             # Make sure at least one shape is included
             if not included_shapes:
-                included_shapes = ["Rectangle"]  # Default to rectangle if nothing selected
+                # Default to rectangle if nothing selected
+                included_shapes = ["Rectangle"]
 
             self.trainer.included_shapes = included_shapes
             print(f"Including shapes: {included_shapes}")
@@ -774,7 +825,8 @@ class EvolutionaryApp:
 
             # Make sure at least one obstacle pattern is included
             if not included_obstacles:
-                included_obstacles = ["Random"]  # Default to random if nothing selected
+                # Default to random if nothing selected
+                included_obstacles = ["Random"]
 
             self.trainer.included_obstacles = included_obstacles
             print(f"Including obstacles: {included_obstacles}")
@@ -786,7 +838,8 @@ class EvolutionaryApp:
                 grid_size=self.grid_size,
                 target_shape=target_shape,  # Use the passed target_shape
                 obstacles=obstacles,        # Use the passed obstacles
-                num_cells=len(target_shape) # Use the length of the target shape
+                # Use the length of the target shape
+                num_cells=len(target_shape)
             )
 
             # Set connectivity constraint if enabled - check both tabs
@@ -794,24 +847,28 @@ class EvolutionaryApp:
                 # Use the main tab's checkbox
                 env.keep_cells_connected = self.main_keep_connected_var.get()
                 if visualize:
-                    print(f"Training - Using main tab connectivity: {env.keep_cells_connected}")
+                    print(
+                        f"Training - Using main tab connectivity: {env.keep_cells_connected}")
             elif hasattr(self, 'keep_connected_var'):
                 # Fall back to custom tab's checkbox
                 env.keep_cells_connected = self.keep_connected_var.get()
                 if visualize:
-                    print(f"Training - Using custom tab connectivity: {env.keep_cells_connected}")
+                    print(
+                        f"Training - Using custom tab connectivity: {env.keep_cells_connected}")
 
             # Initialize cells with the strategy and custom starting positions if enabled
             if hasattr(self, 'use_custom_start_var') and self.use_custom_start_var.get():
                 if hasattr(self, 'custom_start_positions') and self.custom_start_positions:
-                    env.initialize_cells_with_positions(strategy, self.custom_start_positions)
+                    env.initialize_cells_with_positions(
+                        strategy, self.custom_start_positions)
                 else:
                     env.initialize_cells(strategy)
             else:
                 env.initialize_cells(strategy)
 
             # Run simulation
-            final_positions, steps_taken = env.run_simulation(max_steps=200, visualize=visualize)
+            final_positions, steps_taken = env.run_simulation(
+                max_steps=200, visualize=visualize)
 
             # If this is the best individual so far and visualize is True, save the environment
             if visualize:
@@ -836,7 +893,8 @@ class EvolutionaryApp:
 
                     # Update visualization
                     self.trainer._draw_grid(cell_positions)
-                    self.trainer.viz_info_var.set(f"Best individual: {len(final_positions)} cells, {steps_taken} steps")
+                    self.trainer.viz_info_var.set(
+                        f"Best individual: {len(final_positions)} cells, {steps_taken} steps")
 
                     # Update UI
                     self.root.update()
@@ -847,7 +905,8 @@ class EvolutionaryApp:
         def update_progress(generation, max_generations):
             progress = (generation + 1) / max_generations * 100
             self.progress_var.set(progress)
-            self.status_var.set(f"Training generation {generation + 1}/{max_generations}")
+            self.status_var.set(
+                f"Training generation {generation + 1}/{max_generations}")
             self._update_plot()
             self.root.update()
 
@@ -869,7 +928,8 @@ class EvolutionaryApp:
 
         def training_complete():
             # Update status
-            self.status_var.set(f"Training completed. Best fitness: {self.best_individual.fitness:.4f}")
+            self.status_var.set(
+                f"Training completed. Best fitness: {self.best_individual.fitness:.4f}")
 
             # Enable buttons
             self.initialize_btn.config(state=tk.NORMAL)
@@ -887,7 +947,7 @@ class EvolutionaryApp:
 
             # Suggest saving the model
             messagebox.showinfo("Training Complete",
-                               "Training completed successfully! You can now simulate the best model or save it for later use.")
+                                "Training completed successfully! You can now simulate the best model or save it for later use.")
 
         def training_error(error_msg):
             # Update status
@@ -907,7 +967,7 @@ class EvolutionaryApp:
 
             # Show error message
             messagebox.showerror("Training Error",
-                               f"Training failed with error: {error_msg}\n\nPlease try again with different parameters.")
+                                 f"Training failed with error: {error_msg}\n\nPlease try again with different parameters.")
 
         # Start training thread
         thread = threading.Thread(target=training_thread)
@@ -935,11 +995,13 @@ class EvolutionaryApp:
         if hasattr(self, 'main_keep_connected_var'):
             # Use the main tab's checkbox
             self.simulation_env.keep_cells_connected = self.main_keep_connected_var.get()
-            print(f"Simulate best - Using main tab connectivity: {self.simulation_env.keep_cells_connected}")
+            print(
+                f"Simulate best - Using main tab connectivity: {self.simulation_env.keep_cells_connected}")
         elif hasattr(self, 'keep_connected_var'):
             # Fall back to custom tab's checkbox
             self.simulation_env.keep_cells_connected = self.keep_connected_var.get()
-            print(f"Simulate best - Using custom tab connectivity: {self.simulation_env.keep_cells_connected}")
+            print(
+                f"Simulate best - Using custom tab connectivity: {self.simulation_env.keep_cells_connected}")
 
         # Initialize cells with the best strategy
         self.simulation_env.initialize_cells(strategy)
@@ -952,7 +1014,8 @@ class EvolutionaryApp:
 
         def simulation_thread():
             # Run simulation
-            final_positions, steps_taken = self.simulation_env.run_simulation(visualize=True)
+            final_positions, steps_taken = self.simulation_env.run_simulation(
+                visualize=True)
 
             # Get metrics
             metrics = self.simulation_env.get_performance_metrics()
@@ -979,7 +1042,8 @@ class EvolutionaryApp:
     def save_model(self):
         """Save the best individual to a file"""
         if not self.best_individual:
-            messagebox.showerror("Error", "No trained model available to save.")
+            messagebox.showerror(
+                "Error", "No trained model available to save.")
             return
 
         # Ask for file location
@@ -993,10 +1057,12 @@ class EvolutionaryApp:
             return  # User cancelled
 
         # Save the model
-        success = ModelPersistence.save_individual(self.best_individual, file_path)
+        success = ModelPersistence.save_individual(
+            self.best_individual, file_path)
 
         if success:
-            messagebox.showinfo("Success", f"Model saved successfully to {file_path}")
+            messagebox.showinfo(
+                "Success", f"Model saved successfully to {file_path}")
         else:
             messagebox.showerror("Error", "Failed to save model.")
 
@@ -1027,14 +1093,16 @@ class EvolutionaryApp:
         self.best_individual = loaded_individual
 
         # Update status
-        self.status_var.set(f"Model loaded successfully. Fitness: {self.best_individual.fitness:.4f}")
+        self.status_var.set(
+            f"Model loaded successfully. Fitness: {self.best_individual.fitness:.4f}")
 
         # Enable simulate button
         self.simulate_btn.config(state=tk.NORMAL)
         self.save_btn.config(state=tk.NORMAL)
         self.test_model_btn.config(state=tk.NORMAL)
 
-        messagebox.showinfo("Success", "Model loaded successfully. You can now simulate it or test it on custom shapes.")
+        messagebox.showinfo(
+            "Success", "Model loaded successfully. You can now simulate it or test it on custom shapes.")
 
     def _on_shape_type_changed(self, event=None):
         """Handle shape type selection change"""
@@ -1084,7 +1152,8 @@ class EvolutionaryApp:
 
             # Create obstacles based on selected pattern
             num_obstacles = self.custom_obstacles_var.get()
-            self.custom_obstacles = self._create_custom_obstacles(obstacle_pattern, num_obstacles)
+            self.custom_obstacles = self._create_custom_obstacles(
+                obstacle_pattern, num_obstacles)
 
         # Update preview
         self._update_custom_preview()
@@ -1118,7 +1187,8 @@ class EvolutionaryApp:
             for r in range(center_row - radius, center_row + radius + 1):
                 for c in range(center_col - radius, center_col + radius + 1):
                     # Use distance formula to determine if point is in circle
-                    distance = ((r - center_row) ** 2 + (c - center_col) ** 2) ** 0.5
+                    distance = ((r - center_row) ** 2 +
+                                (c - center_col) ** 2) ** 0.5
                     if distance <= radius and 0 <= r < self.grid_size and 0 <= c < self.grid_size:
                         shape.append((r, c))
 
@@ -1182,7 +1252,7 @@ class EvolutionaryApp:
             for r in range(self.grid_size):
                 for c in range(self.grid_size):
                     if (r < border_width or r >= self.grid_size - border_width or
-                        c < border_width or c >= self.grid_size - border_width):
+                            c < border_width or c >= self.grid_size - border_width):
                         pos = (r, c)
                         if pos not in target_set and len(obstacles) < num_obstacles:
                             obstacles.add(pos)
@@ -1216,7 +1286,8 @@ class EvolutionaryApp:
 
                 # Add obstacles around the center
                 for i in range(obstacles_per_cluster):
-                    for attempt in range(10):  # Try up to 10 times to place each obstacle
+                    # Try up to 10 times to place each obstacle
+                    for attempt in range(10):
                         offset_r = random.randint(-2, 2)
                         offset_c = random.randint(-2, 2)
                         r = center_r + offset_r
@@ -1262,7 +1333,8 @@ class EvolutionaryApp:
             center_c = self.grid_size // 2
 
             # Create a horizontal wall across the middle of the grid
-            wall_width = min(self.grid_size - 4, num_obstacles)  # Leave some space on the edges
+            # Leave some space on the edges
+            wall_width = min(self.grid_size - 4, num_obstacles)
             gap_position = center_c  # Gap in the middle
 
             # Add obstacles to form the wall
@@ -1369,7 +1441,8 @@ class EvolutionaryApp:
         for r, c in self.custom_target_shape:
             x1, y1 = c * cell_size, r * cell_size
             x2, y2 = x1 + cell_size, y1 + cell_size
-            self.preview_canvas.create_rectangle(x1, y1, x2, y2, fill="lightgreen")
+            self.preview_canvas.create_rectangle(
+                x1, y1, x2, y2, fill="lightgreen")
 
         # Draw starting positions if defined
         if hasattr(self, 'custom_start_positions') and self.custom_start_positions:
@@ -1391,7 +1464,8 @@ class EvolutionaryApp:
 
         # Bind click event for custom editing if not already bound
         if not hasattr(self, 'click_binding'):
-            self.click_binding = self.preview_canvas.bind("<Button-1>", self._on_canvas_click)
+            self.click_binding = self.preview_canvas.bind(
+                "<Button-1>", self._on_canvas_click)
 
     def _clear_custom_shape(self):
         """Clear the custom target shape"""
@@ -1477,7 +1551,8 @@ class EvolutionaryApp:
 
                 # Limit to number of cells in target shape
                 if len(self.custom_start_positions) > len(self.custom_target_shape):
-                    self.custom_start_positions.pop(0)  # Remove oldest position
+                    self.custom_start_positions.pop(
+                        0)  # Remove oldest position
 
                 # Print for debugging
                 print(f"Custom start positions: {self.custom_start_positions}")
@@ -1488,11 +1563,13 @@ class EvolutionaryApp:
     def _test_model_on_custom_shape(self):
         """Test the loaded model on the custom shape and obstacles"""
         if not self.best_individual:
-            messagebox.showerror("Error", "No model loaded. Please load a model first.")
+            messagebox.showerror(
+                "Error", "No model loaded. Please load a model first.")
             return
 
         if not self.custom_target_shape:
-            messagebox.showerror("Error", "No custom shape created. Please create a shape first.")
+            messagebox.showerror(
+                "Error", "No custom shape created. Please create a shape first.")
             return
 
         # Get strategy from best individual
@@ -1510,11 +1587,13 @@ class EvolutionaryApp:
         if hasattr(self, 'main_keep_connected_var'):
             # Use the main tab's checkbox
             test_env.keep_cells_connected = self.main_keep_connected_var.get()
-            print(f"Test model - Using main tab connectivity: {test_env.keep_cells_connected}")
+            print(
+                f"Test model - Using main tab connectivity: {test_env.keep_cells_connected}")
         elif hasattr(self, 'keep_connected_var'):
             # Fall back to custom tab's checkbox
             test_env.keep_cells_connected = self.keep_connected_var.get()
-            print(f"Test model - Using custom tab connectivity: {test_env.keep_cells_connected}")
+            print(
+                f"Test model - Using custom tab connectivity: {test_env.keep_cells_connected}")
 
         # Check if we have custom starting positions
         use_custom_start = False
@@ -1522,12 +1601,14 @@ class EvolutionaryApp:
             # Make sure we have at least one starting position
             if len(self.custom_start_positions) > 0:
                 use_custom_start = True
-                print(f"Using custom start positions: {self.custom_start_positions}")
+                print(
+                    f"Using custom start positions: {self.custom_start_positions}")
 
         # Initialize cells with the best strategy
         if use_custom_start:
             # Use custom starting positions
-            test_env.initialize_cells_with_positions(strategy, self.custom_start_positions)
+            test_env.initialize_cells_with_positions(
+                strategy, self.custom_start_positions)
         elif self.obstacle_pattern_var.get() == "Horizontal Wall Above":
             # For the horizontal wall above pattern, place cells below the wall
             self._place_cells_below_wall(test_env, strategy)
@@ -1543,7 +1624,8 @@ class EvolutionaryApp:
 
         def simulation_thread():
             # Run simulation
-            final_positions, steps_taken = test_env.run_simulation(visualize=True)
+            final_positions, steps_taken = test_env.run_simulation(
+                visualize=True)
 
             # Get metrics
             metrics = test_env.get_performance_metrics()
@@ -1586,7 +1668,8 @@ class EvolutionaryApp:
         num_cells = len(self.custom_target_shape)
 
         # Calculate how many cells to place in each row
-        cells_per_row = min(6, num_cells)  # Maximum 6 cells per row as in the image
+        # Maximum 6 cells per row as in the image
+        cells_per_row = min(6, num_cells)
 
         # Place cells in the last row first
         last_row = self.grid_size - 1
@@ -1605,7 +1688,8 @@ class EvolutionaryApp:
                 start_positions.append((second_last_row, col))
 
         # Initialize cells with these positions
-        env.initialize_cells_with_positions(strategy, start_positions[:num_cells])
+        env.initialize_cells_with_positions(
+            strategy, start_positions[:num_cells])
 
     def reset(self):
         """Reset the application to initial state"""
@@ -1635,6 +1719,7 @@ class EvolutionaryApp:
         self.train_btn.config(state=tk.DISABLED)
         self.simulate_btn.config(state=tk.DISABLED)
         self.save_btn.config(state=tk.DISABLED)
+
 
 if __name__ == "__main__":
     root = tk.Tk()
